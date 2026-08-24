@@ -1,0 +1,184 @@
+Ah — **that changes the interpretation substantially**.
+
+If iLab-20M contains **single-object images**, then it is actually an excellent controlled environment for studying the *first stage* of your hypothesis:
+
+> Can an SSL system learn the concept of an **object as a spatial entity** purely from transformations?
+
+You don't have the multi-object discovery problem yet, because the image is guaranteed to contain an object. That lets you isolate **objectness/localization** from object counting and object separation.
+
+### I would formulate the problem as two stages
+
+#### Stage 1 — learn objectness from transformation
+
+Given
+
+[
+x,\quad T(x)
+]
+
+learn a box/mask:
+
+[
+B(x)
+]
+
+such that
+
+[
+\boxed{B(T(x))=T(B(x))}
+]
+
+with no box annotations.
+
+The network has to discover which region is the thing that remains coherent under transformation.
+
+You could combine this with an object representation:
+
+[
+z(x)=f(x,B(x))
+]
+
+and enforce
+
+[
+z(x)\approx z(T(x)).
+]
+
+So:
+
+[
+\boxed{
+\text{objectness} =
+\text{geometric equivariance}
++
+\text{object identity invariance}
+}
+]
+
+---
+
+### But there's an important danger
+
+Because every iLab image contains exactly **one object**, a model could cheat.
+
+For example, it could simply predict:
+
+[
+B(x)=\text{whole image}.
+]
+
+That is perfectly transformation-consistent.
+
+So you need a mechanism that makes **tight localization** preferable to trivial localization.
+
+This is probably the most important technical problem in the project.
+
+Some possibilities:
+
+**1. Information bottleneck**
+
+Force the object representation to contain enough information to reconstruct/classify the transformed object, while minimizing the selected region.
+
+**2. Area penalty**
+
+[
+\mathcal L_{\mathrm{area}} = \frac{|B|}{|I|}
+]
+
+but this alone could lead to tiny boxes.
+
+**3. Reconstruction**
+
+Crop the predicted object and require it to explain the corresponding region in the transformed image.
+
+**4. Multi-view agreement**
+
+Use several transformations:
+
+[
+T_1(x),T_2(x),T_3(x)
+]
+
+and require all predicted boxes to map to the same canonical object region.
+
+**5. Contrastive object/background learning**
+
+The selected region should produce stable representations while surrounding regions should not.
+
+---
+
+## And iLab-20M gives you something unusually valuable
+
+Because you **know the transformation exactly**, you can evaluate whether the model has learned the correct geometric relationship without using annotations during training.
+
+For example:
+
+[
+x\rightarrow B
+]
+
+[
+R_{90}(x)\rightarrow B'
+]
+
+and you know mathematically that
+
+[
+B'=R_{90}(B).
+]
+
+That's an extremely clean SSL signal.
+
+You can then reserve the actual ground-truth boxes **only for evaluation**.
+
+---
+
+# I would actually make the first paper much narrower
+
+Don't start with "unsupervised object detection."
+
+Start with:
+
+> **Can physical transformation consistency induce objectness?**
+
+Then establish three claims:
+
+### Claim 1
+
+A model trained without box labels can discover the foreground object.
+
+### Claim 2
+
+The discovered region is transformation-equivariant.
+
+### Claim 3
+
+The learned objectness transfers to **natural multi-object datasets**.
+
+That third experiment is what makes the work exciting.
+
+Train on:
+
+[
+\boxed{\text{iLab-20M only}}
+]
+
+with **zero bounding-box labels**.
+
+Then evaluate object proposals on COCO/LVIS/Objects365.
+
+If the model trained exclusively on single-object iLab images produces useful object proposals on natural multi-object scenes, you've demonstrated something considerably more interesting:
+
+> **A notion of objectness learned from transformation structure transfers beyond the training distribution.**
+
+And then you can progressively move from:
+
+[
+\text{single object}
+\rightarrow
+\text{multiple objects}
+\rightarrow
+\text{natural scenes}.
+]
+
+That gives you a very clean experimental story.

@@ -1,0 +1,211 @@
+Yes—but **the exact question you are asking is less studied than EOT-style robust attacks**, and I think that distinction matters.
+
+Your question is:
+
+> Take a perturbation optimized for **one specific observation** (x). Do not optimize it over transformations. Now transform the underlying image and ask whether the *same perturbation, transformed along with the object*, remains adversarial?
+
+Formally:
+
+[
+x_{\rm adv}=x+\delta
+]
+
+then
+
+[
+T(x_{\rm adv})=T(x)+T(\delta),
+]
+
+and ask whether
+
+[
+f(T(x)+T(\delta))\ne f(T(x)).
+]
+
+That is different from:
+
+[
+\delta^*=
+\arg\max_\delta
+E_T[L(f(T(x+\delta)),y)],
+]
+
+which is EOT.
+
+### What I found
+
+The closest foundational result is actually quite revealing. Athalye et al.'s work showed that **ordinary adversarial examples can fail under tiny transformations**: their example could lose its adversarial property after a very small zoom. They then deliberately optimized perturbations over transformations to produce transformation-invariant attacks. ([OpenAI][1])
+
+So the literature has extensively studied:
+
+> **"How do I make an attack survive transformations?"**
+
+and a large literature subsequently uses input transformations to improve **adversarial transferability**. For example, scale-invariant, translation-invariant, diverse-input, and newer dynamic-transformation attacks deliberately optimize with transformed inputs. ([ScienceDirect][2])
+
+But that's **not quite your question**.
+
+---
+
+### Your question is more like a *natural equivariance test for adversarial vulnerability*
+
+You would generate **one ordinary attack**:
+
+[
+\delta_x = A(f,x)
+]
+
+and then measure:
+
+[
+S(T)
+====
+
+\mathbf 1[
+f(T(x)+T(\delta_x))
+\neq
+f(T(x))
+].
+]
+
+Then sweep through a physically meaningful transformation space:
+
+[
+T_\theta,\qquad
+\theta\in G.
+]
+
+For iLab, you could have:
+
+[
+\theta =
+(\text{rotation},\text{scale},\text{viewpoint},\ldots).
+]
+
+Then measure something like
+
+[
+\boxed{
+R(x,\delta)
+===========
+
+\mathbb E_{T\sim G}
+[
+S(T)
+]
+}
+]
+
+**without having optimized (\delta) for (G).**
+
+That is a very different measurement from EOT.
+
+---
+
+### And iLab-20M makes this unusually clean
+
+This is where I think your idea gets interesting.
+
+You have the same physical object under controlled transformations:
+
+[
+x_1,x_2,\ldots,x_n.
+]
+
+Generate an attack on **only (x_1)**:
+
+[
+x_1+\delta_1.
+]
+
+Then transform the *attack itself* according to the known physical transformation:
+
+[
+T_{1\rightarrow j}(\delta_1).
+]
+
+Now test:
+
+[
+x_j+T_{1\rightarrow j}(\delta_1).
+]
+
+You can ask:
+
+[
+\boxed{
+\text{How far does adversarial vulnerability naturally travel along the object's transformation manifold?}
+}
+]
+
+That wording is quite different from "robust adversarial examples."
+
+---
+
+### There's an even stronger experiment
+
+Compare three things:
+
+**A. Natural transfer**
+
+[
+\delta_1
+\rightarrow
+T(\delta_1)
+]
+
+without any transformation-aware optimization.
+
+**B. EOT**
+
+Optimize:
+
+[
+\delta_{\rm EOT}
+================
+
+\arg\max_\delta E_T[L(f(T(x+\delta)),y)].
+]
+
+**C. Independently optimized attacks**
+
+For every transformed image, generate its own:
+
+[
+\delta_T^*.
+]
+
+Then compare:
+
+[
+\underbrace{A\rightarrow T(A)}*{\text{natural}}
+\quad
+vs
+\quad
+\underbrace{\text{EOT}}*{\text{optimized}}
+\quad
+vs
+\quad
+\underbrace{A_T}_{\text{independent optimum}}.
+]
+
+This would tell you something much more fundamental:
+
+> **How much of adversarial vulnerability is tied to the underlying object/representation, and how much is tied to the particular pixel arrangement?**
+
+That's the part I don't see directly answered by the transformation-robust attack literature.
+
+There is even recent work explicitly optimizing transformations to improve adversarial transferability, which reinforces that the field is mostly asking the *optimization* question rather than measuring the natural transformation of a fixed attack. ([ScienceDirect][3])
+
+So I would **not claim "nobody has studied this."** A reviewer could point to EOT and transformation-based transfer attacks immediately.
+
+But I think this narrower question—
+
+> **Given a perturbation optimized at one observation, what is the geometry of its adversarial validity across the object's physical transformation manifold?**
+
+—is sufficiently distinct that it is worth investigating, especially with **iLab-20M**, where you can control the transformation and know exactly which images correspond to the same physical object.
+
+And it connects surprisingly well to your embedding-space idea: you could ask whether **adversarial transfer across transformations correlates with the geometry of the pretrained embedding space**. That could turn this into a study of *representation-level versus pixel-level adversarial vulnerability*, rather than merely another attack paper.
+
+[1]: https://openai.com/index/robust-adversarial-inputs/?utm_source=chatgpt.com "Robust adversarial inputs | OpenAI"
+[2]: https://www.sciencedirect.com/science/article/pii/S1568494625017223?utm_source=chatgpt.com "Enhancing adversarial transferability by resolving gradient conflicts in multi-input transformations - ScienceDirect"
+[3]: https://www.sciencedirect.com/science/article/pii/S016786552500087X?utm_source=chatgpt.com "Enhancing visual adversarial transferability via affine transformation of intermediate-level perturbations - ScienceDirect"

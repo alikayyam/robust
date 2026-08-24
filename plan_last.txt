@@ -1,0 +1,277 @@
+Yes — and I think this could be a **very useful first experiment before designing the SSL method**.
+
+The interesting question is not simply whether ResNet/ViT embeddings cluster. We already know they do. The more interesting question is:
+
+> **Does the embedding space spontaneously organize according to physical object transformations, independently of semantic class?**
+
+Since iLab-20M gives you controlled transformations, you can test this unusually cleanly.
+
+### 1. Don't start with t-SNE
+
+I'd first extract embeddings from several pretrained models:
+
+* ResNet-50
+* ConvNeXt
+* ViT-B/16
+* DINO ViT
+* DINOv2 ViT
+* perhaps CLIP ViT
+
+For every iLab image, record:
+
+[
+z=f(x)
+]
+
+and retain the metadata:
+
+[
+(\text{object ID},\text{class},\text{pose},\text{rotation},\text{scale},\text{viewpoint},\ldots).
+]
+
+Then ask what dimensions of variation organize the embedding space.
+
+---
+
+## The experiment I find most interesting
+
+Take **one physical object** and its transformations:
+
+[
+x,;T_1(x),;T_2(x),\ldots,T_n(x).
+]
+
+Measure:
+
+[
+d(z(x),z(T_i(x))).
+]
+
+Compare this with:
+
+[
+d(z(x),z(x_j))
+]
+
+where (x_j) is a **different object**.
+
+You can ask:
+
+[
+\boxed{
+d(\text{same object, different transformation})
+<
+d(\text{different object})
+?
+}
+]
+
+If yes, the representation has learned some notion of **object identity invariant to physical transformation**.
+
+But here's where it gets much more interesting.
+
+---
+
+# Look for the geometry of transformations
+
+Suppose rotation is represented in embedding space.
+
+For an object:
+
+[
+z(\theta)
+]
+
+where (\theta) is rotation.
+
+Does the embedding trajectory have structure?
+
+For example:
+
+[
+z(0^\circ)
+\rightarrow
+z(30^\circ)
+\rightarrow
+z(60^\circ)
+\rightarrow
+z(90^\circ)
+]
+
+might form a smooth manifold.
+
+You can measure:
+
+[
+d(z(\theta),z(\theta+\Delta\theta)).
+]
+
+If the representation understands physical transformation, you might find:
+
+[
+d(z(\theta),z(\theta+\Delta\theta))
+]
+
+increases smoothly with (\Delta\theta).
+
+Even more interesting:
+
+[
+z(\theta+90^\circ)-z(\theta)
+]
+
+might be approximately consistent across different objects.
+
+That would suggest the model has something resembling a **rotation operator in representation space**.
+
+---
+
+# You can test this directly
+
+Learn a linear transformation (A_\theta) such that
+
+[
+z(T_\theta(x))\approx A_\theta z(x).
+]
+
+Then evaluate whether
+
+[
+A_{\theta_1}A_{\theta_2}
+\approx
+A_{\theta_1+\theta_2}.
+]
+
+This is a beautiful test.
+
+If it works, the embedding space may approximately encode the **group structure of physical transformations**.
+
+You could do the same for scale:
+
+[
+A_s z(x)\approx z(T_s(x)).
+]
+
+Then test composition:
+
+[
+A_{s_1}A_{s_2}\approx A_{s_1s_2}.
+]
+
+---
+
+# But I would add a second dimension: object vs background
+
+Since your ultimate goal is objectness, image-level embeddings aren't enough.
+
+For CNNs and ViTs, extract **spatial features**:
+
+[
+F(x)\in\mathbb R^{H\times W\times D}.
+]
+
+Then examine whether spatial features organize according to object identity.
+
+For corresponding transformations:
+
+[
+F(x)*{p}
+\leftrightarrow
+F(T(x))*{T(p)}.
+]
+
+Ask whether:
+
+[
+\operatorname{sim}
+(F(x)*p,F(T(x))*{T(p)})
+]
+
+is significantly higher for object pixels than background pixels.
+
+That would be **extremely relevant** to your hypothesis.
+
+---
+
+# And here's a potentially great baseline experiment
+
+Take pretrained:
+
+**ResNet → supervised ImageNet**
+
+**ViT → supervised ImageNet**
+
+**DINO → SSL**
+
+**DINOv2 → SSL**
+
+Then compare their spatial representations on iLab.
+
+You might discover something like:
+
+| Model          | Transformation invariance | Object/background separation | Transformation equivariance |
+| -------------- | ------------------------: | ---------------------------: | --------------------------: |
+| ResNet         |                         ? |                            ? |                           ? |
+| supervised ViT |                         ? |                            ? |                           ? |
+| DINO           |                         ? |                            ? |                           ? |
+| DINOv2         |                         ? |                            ? |                           ? |
+
+This could tell you **what existing SSL models already know about objects** before you train anything.
+
+---
+
+## There's an especially interesting hypothesis
+
+I would test:
+
+> **DINO-like models may have a representation that is invariant to object identity-preserving transformations, but their spatial features may not explicitly encode the transformation geometry needed for localization.**
+
+If true, your proposed method could be viewed as adding:
+
+[
+\text{DINO-like invariance}
++
+\text{explicit geometric equivariance}
+]
+
+to obtain better objectness.
+
+---
+
+# One more experiment I strongly recommend
+
+Train a very simple probe on frozen embeddings to predict:
+
+1. object identity
+2. object category
+3. rotation
+4. scale
+5. bounding-box coordinates
+
+without fine-tuning the backbone.
+
+Then compare probe performance.
+
+If you find:
+
+[
+\text{identity easy}
+]
+
+[
+\text{category easy}
+]
+
+but
+
+[
+\text{box prediction surprisingly difficult},
+]
+
+that would provide a very nice motivation for your work:
+
+> Existing pretrained representations encode **what the object is**, but not sufficiently **where the object is**.
+
+Conversely, if DINO already makes box prediction extremely easy, that's a warning that the novelty needs to be elsewhere.
+
+**So I would absolutely do this analysis first.** iLab-20M is unusually well suited because its controlled transformations give you ground-truth factors of variation that you can probe quantitatively, rather than relying on vague visualizations.
