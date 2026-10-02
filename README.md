@@ -41,6 +41,13 @@ discovered while building the experiment, is in
 **Figures**
 - [`make_figures.py`](make_figures.py), [`make_image_figures.py`](make_image_figures.py), [`make_decision_slice_figures.py`](make_decision_slice_figures.py) — regenerate all `fig_*.pdf` outputs used in the paper.
 
+**Root-cause follow-up** ([`root_cause_paper.tex`](root_cause_paper.tex) / [`.pdf`](root_cause_paper.pdf))
+- [`root_cause_experiments.py`](root_cause_experiments.py) — E1-E4: Gaussian task with exact Bayes radii vs. trained MLPs (spread over k dimensions, who is vulnerable, interventions).
+- [`root_cause_factorial.py`](root_cause_factorial.py) — E5: feature scale vs. reliability.
+- [`root_cause_realdata.py`](root_cause_realdata.py) — E6: MNIST with orthogonal block mixing of the input.
+- [`root_cause_cifar.py`](root_cause_cifar.py) — E6b: CIFAR-10 CNN restricted to the top-m PCA directions.
+- [`root_cause_figures.py`](root_cause_figures.py) — figures and numbers from the `root_cause_*.pkl` results.
+
 ## Reproducing
 
 ```bash
