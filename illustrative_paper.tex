@@ -20,7 +20,7 @@ A Hands-On Tour of Adversarial Vulnerability}
 
 \begin{abstract}
 This paper is meant to be \emph{illustrative and tutorial}: a hands-on illustration of why distributing predictive evidence across many inputs
-can make a model vulnerable to small per-input ($\ell_\infty$) perturbations, aimed at readers without specialist background. Image classifiers can be fooled by changes too small for a person to notice.
+can make a model vulnerable to small per-input ($\ell_\infty$) perturbations, aimed at readers without specialist background; it is intended for a broad audience, including students and practitioners. Image classifiers can be fooled by changes too small for a person to notice.
 Two well-known ideas explain parts of this: that networks add up tiny effects across many inputs (Goodfellow et al.), and that they rely on clues that are predictive but fragile (Ilyas et al.).
 We use one controlled toy problem, a task with one reliable clue and five weak clues whose properties we know exactly, as a bridge between the two, taking it apart one piece at a time with a small experiment and a figure per question.
 Keeping the total evidence fixed and spreading it over more inputs leaves accuracy unchanged but makes the per-input change needed to fool the model shrink as one over the square root of the number of inputs (eight times smaller at 64 inputs),
@@ -61,12 +61,13 @@ vote, even though no single voter was ever strongly persuaded.}
 
 \paragraph{How to read this paper.} Each section poses a question, runs a small experiment, and
 gives the answer in a box. Appendix~\ref{sec:glossary} is a short glossary. Numbers are averages over
-10 random training runs (mean $\pm$ one standard deviation) unless stated; Appendix~\ref{app:details} gives the exact settings.
+10 random training runs (mean $\pm$ one standard deviation) unless stated; Appendix~\ref{app:details} gives the exact settings, and all code is at \url{https://github.com/alikayyam/robust}.
 
-\paragraph{Where this sits.} Szegedy et al.~\cite{szegedy2014} first described adversarial examples; Goodfellow et al.~\cite{goodfellow2015}
-introduced the one-step attack (FGSM) used here and Madry et al.~\cite{madry2018} its iterated version (PGD). Ilyas et al.~\cite{ilyas2019} proposed the
-robust/non-robust decomposition we test, and Tsipras et al.~\cite{tsipras2018} argued robustness and accuracy can be at odds, which our trade-offs reproduce in
-miniature. Athalye et al.~\cite{athalye2018} showed that many defenses fail once the attacker adapts, which is why we measure and do not propose a defense.
+\paragraph{Where this sits.} Szegedy et al.~\cite{szegedy2014} first described adversarial examples. Goodfellow et al.~\cite{goodfellow2015}
+introduced the one-step attack (FGSM) used here, and Madry et al.~\cite{madry2018} its iterated version (PGD).
+Ilyas et al.~\cite{ilyas2019} proposed the robust/non-robust decomposition we test. Tsipras et al.~\cite{tsipras2018} argued that robustness and accuracy can be at odds,
+which our trade-offs reproduce in miniature. Athalye et al.~\cite{athalye2018} showed that many defenses fail once the attacker adapts;
+that is why we measure here and do not propose a defense.
 
 \section{A toy world}
 \label{sec:world}
@@ -169,6 +170,8 @@ A picture helps (Figure~\ref{fig:geometry}). Draw the allowed changes for two in
 square must grow until its \emph{side} reaches it. If the same evidence is split over two inputs, the boundary is diagonal, and the square's \emph{corner}, which moves both inputs at once, reaches it sooner. The straight-line distance to the boundary (blue circle) is the same in both cases;
 only the square, the per-input change, shrinks, by $1/\sqrt2$ here and by $1/\sqrt k$ for $k$ inputs.
 
+In symbols: if $k$ inputs carry equal weights $c/\sqrt k$, the straight-line size of the weights is $\|w\|_2=c$ whatever $k$ is, while the sum of absolute weights is $\|w\|_1=c\sqrt k$. A margin $M$ then needs a total change of $M/\|w\|_2=M/c$ but only a per-input change of $M/\|w\|_1=M/(c\sqrt k)$. So the per-input flip size is the total flip size divided by $\sqrt k$.
+
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.9\textwidth]{fig_il_geometry.pdf}
@@ -219,8 +222,8 @@ trained network (A) & $0.245\pm0.011$ & $0.134\pm0.017$ & $0.55$ \\
 \end{table}
 
 \plain{The network leans on the weak clues a bit \emph{less}, relative to the reliable one, than the best possible rule does. So the
-common story, ``the network latches onto weak spurious clues too much,'' is not what is happening here. The weak clues are used about as
-much as they deserve, and that is already enough to be exploited. The difference is modest, and we would not claim it holds for other
+common story, ``the network latches onto weak spurious clues too much,'' is not what is happening here. The weak clues are genuinely predictive (just individually weak), and they are used about as
+much as they deserve; that is already enough to be exploited. The difference is modest, and we would not claim it holds for other
 networks or training recipes.}
 
 \begin{figure}[h]
@@ -454,7 +457,7 @@ The ratio rises from about $2$ to about $18$ while accuracy slips mildly; at the
 activity falls from $0.42$ to $0.07$ and the fraction of silent units rises from $38\%$ to $93\%$. But it has no handle on \emph{which input} to keep: the reliable-to-weak weight ratio stays flat ($1.97\to1.81$), and the
 weak-clue attack is as effective as ever ($0.260$ against $0.255$--$0.276$ at every strength up to $2.0$). Pushed harder, it fails abruptly instead of gradually: each run either stays fully accurate or becomes a dead network at chance
 (Figure~\ref{fig:actsparse}); no run was ever in between. The number of dead runs rises with strength ($0$ of $10$ up to $2.0$, $2$ at $3.0$, $7$ at $4.0$, $9$ at $6.0$, all $10$ at $8.0$), so the \emph{average} accuracy appears to decline smoothly although no single network ever does.
-A single run would therefore either miss the collapse or mistake it for typical. (We tested one such penalty on this one network; we do not claim it holds for other forms of activation sparsity.)
+The mechanism is simple: the penalty pushes each hidden unit's input negative everywhere, a silenced unit passes no gradient, and so it cannot recover; once every unit is silent the network is dead. A single run would therefore either miss the collapse or mistake it for typical. (We tested one such penalty on this one network; we do not claim it holds for other forms of activation sparsity.)
 
 \begin{figure}[h]
 \centering
@@ -465,6 +468,24 @@ A single run would therefore either miss the collapse or mistake it for typical.
 
 \plain{Every fix that works does the same thing: it reduces the sum of weights by giving up some of the weak clues' information, so robustness is paid for in accuracy.
 Penalising the \emph{input weights} lets the model drop whole clues; shrinking everything a little, or penalising hidden \emph{activity}, does not, and the latter breaks networks all at once.}
+
+\begin{table}[h]
+\centering
+\caption{Practical summary of the fixes (numbers from this section; attack on the five weak clues at $\epsilon=0.3$, baseline $0.260$ at $0.994$ accuracy).}
+\label{tab:summary}
+\small
+\begin{tabular}{p{3.1cm}p{3.4cm}p{3.0cm}p{4.6cm}}
+\toprule
+Fix & Effect on the weak-clue attack & Accuracy cost & Failure mode \\
+\midrule
+$L_1$, group Lasso, elastic net (switch whole inputs off) & large: $0.26\to0.02$--$0.05$ & $1.5$--$3$ points & too strong over-shrinks the reliable clue; concentrates the model on one clue (single point of failure) \\
+Delete weak inputs after training & large but smaller: $0.052$ at $0.970$ accuracy & about $2.4$ points & worse trade than $L_1$ at the same accuracy \\
+Remove weak inputs by design (Model B) & full-attack share $0.536\to0.211$ & $3.8$ points & needs to know in advance which clue is reliable \\
+$L_2$ (ordinary weight decay) & small: $0.260\to0.213$ & none, until it collapses & abrupt collapse to chance at strength $0.4$ \\
+Activity penalty & none: $0.255$--$0.276$ & none, until it collapses & each run is fully accurate or dead; no input selection \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Question 6: when does this happen at all?}
 \label{sec:when}
@@ -512,7 +533,7 @@ pixel, so the shape is hard to see by eye (Figures~\ref{fig:cleansamples}, \ref{
 \end{figure}
 
 \textbf{Surprise.} In the toy task, a near-perfect reliable clue switched the effect off (Section~\ref{sec:when}). Here the shape is nearly perfect, yet the network still picks up the background: an attacker who may change \emph{only the border pixels},
-never touching the shape, flips $46\%$--$71\%$ of answers at nudge sizes $0.2$--$0.4$. We do not have a full explanation; a cheap, uniform cue is easy for a convolutional network to pick up.
+never touching the shape, flips $46\%$--$71\%$ of answers at nudge sizes $0.2$--$0.4$. We do not have a tested explanation, but a plausible one is that the background level is shared by every border pixel, so pooling over many pixels gives the network a cheap, low-noise estimate of it, much easier to read than a noisy shape.
 
 \begin{table}[h]
 \centering
@@ -591,8 +612,7 @@ large deep networks on natural data work this way.}
 \paragraph{Limits.} One toy task with independent clues, a single small network, and a one-step attack in the main comparisons. The real-data checks
 support the geometry but not the toy world's size of effect. We did not test correlated clues, deep networks, or adversarial training.
 
-\paragraph{Where to go next.} A natural extension is to ask whether a network whose internal representation is \emph{equivariant} to a physical transformation (rotation, scale, viewpoint) makes attacks transfer
-predictably across viewpoints, since by the chain rule the gradient, and so an attack built from it, would then transform predictably too. The toy world gives a controlled place to start; we have not tested this here.
+\paragraph{An open question.} We leave the following for follow-up, and have not tested it here. Suppose a network's internal representation is \emph{equivariant} to a physical transformation (rotation, scale, viewpoint). Would an attack made at one viewpoint then transfer predictably to another? By the chain rule the gradient, and so an attack built from it, would transform predictably too. The toy world gives a controlled place to start.
 
 \appendix
 
@@ -619,7 +639,7 @@ $\lambda$ times the mean hidden activation. A run counts as a dead network if it
 
 \paragraph{Images.} Circles and squares: $28\times28$ grayscale, shape position jittered by $\pm2$ pixels, background level shifted by class with overlapping noise, plus per-pixel noise; a two-layer convolutional network; 10 runs (5 for the two-tower network and the iterated-attack check).
 Figure~\ref{fig:mnistadv} uses the unmixed MNIST network below, with the smallest of the nudge sizes $0.02$--$0.08$ at which an iterated attack flips the answer. MNIST: a 784--256--10 network trained with momentum SGD on 10{,}000 images, 1{,}000 test images, 5 runs, inputs rotated within random blocks of size $k\in\{1,4,16,49,196,784\}$. CIFAR-10: a five-layer convolutional network on the top-$m$ principal components
-($m\in\{16,64,256,1024,3072\}$) of the images; 20{,}000 training and 500 test images, 5 runs; the attacker perturbs raw pixels with no clipping. Code for all experiments accompanies this paper.
+($m\in\{16,64,256,1024,3072\}$) of the images; 20{,}000 training and 500 test images, 5 runs; the attacker perturbs raw pixels with no clipping. Code for all experiments, with fixed seeds and the settings above, is at \url{https://github.com/alikayyam/robust}.
 
 \section{Glossary}
 \label{sec:glossary}

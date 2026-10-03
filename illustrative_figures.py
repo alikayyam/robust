@@ -4,6 +4,7 @@ more and more dimensions."""
 import numpy as np, torch
 import matplotlib
 matplotlib.use("Agg")
+matplotlib.rcParams["pdf.fonttype"] = 42  # embed TrueType so figure text is searchable
 import matplotlib.pyplot as plt
 import feature_reliance_unclipped as f
 

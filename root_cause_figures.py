@@ -4,6 +4,7 @@ import pickle
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
+matplotlib.rcParams["pdf.fonttype"] = 42  # embed TrueType so figure text is searchable
 import matplotlib.pyplot as plt
 
 R = pickle.load(open("root_cause_results.pkl", "rb"))

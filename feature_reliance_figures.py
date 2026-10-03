@@ -3,6 +3,7 @@ import pickle
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
+matplotlib.rcParams["pdf.fonttype"] = 42  # embed TrueType so figure text is searchable
 import matplotlib.pyplot as plt
 
 main = pickle.load(open("feature_reliance_unclipped_main_bayes_modelc.pkl", "rb"))["main"]
