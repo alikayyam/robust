@@ -52,6 +52,10 @@ discovered while building the experiment, is in
 - [`feature_reliance_unclipped.py`](feature_reliance_unclipped.py) — unclipped re-run of the toy experiments: A/B/C attacks by subset, Bayes and permutation importance, regularizer comparison, phase diagram, Model C scale check.
 - [`feature_reliance_figures.py`](feature_reliance_figures.py) — figures from the `feature_reliance_unclipped_*.pkl` results.
 
+**Illustrative tutorial** ([`illustrative_paper.tex`](illustrative_paper.tex) / [`.pdf`](illustrative_paper.pdf))
+- A self-contained, plain-language tour of the possible causes of adversarial vulnerability using the toy task, with many figures.
+- [`illustrative_figures.py`](illustrative_figures.py), [`illustrative_mnist.py`](illustrative_mnist.py) — generate the `fig_il_*` figures.
+
 ## Reproducing
 
 ```bash

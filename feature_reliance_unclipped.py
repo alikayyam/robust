@@ -249,6 +249,75 @@ def part_modelc():
     return out
 
 
+def pgd(m, x, y, eps, mask, steps=20, restarts=4):
+    with torch.no_grad():
+        ok = m(x).argmax(1) == y
+    xc, yc = x[ok], y[ok]
+    mk = torch.tensor(mask, dtype=torch.float32)
+    hit = torch.zeros(len(xc), dtype=torch.bool)
+    for _ in range(restarts):
+        d = (torch.rand_like(xc) * 2 - 1) * eps * mk
+        for _ in range(steps):
+            d.requires_grad_(True)
+            loss = nn.functional.cross_entropy(m(xc + d), yc)
+            g = torch.autograd.grad(loss, d)[0]
+            d = (d.detach() + (eps / 4) * g.sign() * mk).clamp(-eps, eps) * mk
+        with torch.no_grad():
+            hit |= m(xc + d).argmax(1) != yc
+    return hit.float().mean().item()
+
+
+def part_pgd():
+    out = {}
+    for s in SEEDS:
+        (xt, yt), (xs, ys) = data(s)
+        torch.manual_seed(s)
+        A = train(MLP(6), xt, yt)
+        torch.manual_seed(s)
+        B = train(MLP(1), xt[:, :1], yt)
+        for e in EPS_GRID:
+            for k in ["all", "reliable", "weak5"]:
+                out.setdefault(("A", k, e, "fgsm"), []).append(fgsm(A, xs, ys, e, MASKS[k]))
+                out.setdefault(("A", k, e, "pgd"), []).append(pgd(A, xs, ys, e, MASKS[k]))
+            out.setdefault(("B", "reliable", e, "fgsm"), []).append(fgsm(B, xs[:, :1], ys, e, [1]))
+            out.setdefault(("B", "reliable", e, "pgd"), []).append(pgd(B, xs[:, :1], ys, e, [1]))
+        print("pgd seed", s, flush=True)
+    return out
+
+
+def train_act(m, x, y, lam, steps=500, lr=0.02):
+    opt = torch.optim.Adam(m.parameters(), lr=lr, weight_decay=WD)
+    ce = nn.CrossEntropyLoss()
+    for _ in range(steps):
+        opt.zero_grad()
+        h = torch.relu(m.net[0](x))
+        loss = ce(m.net[2](h), y) + lam * h.mean()
+        loss.backward()
+        opt.step()
+    return m
+
+
+def part_actsparse():
+    out = {}
+    for lam in [0.0, 0.1, 0.3, 1.0, 1.4, 1.6, 1.8, 2.0]:
+        r = dict(acc=[], act=[], zero=[], ratio=[], weak=[], rel=[], all=[])
+        for s in SEEDS:
+            (xt, yt), (xs, ys) = data(s)
+            torch.manual_seed(s)
+            m = train_act(MLP(6), xt, yt, lam)
+            with torch.no_grad():
+                h = torch.relu(m.net[0](xs))
+            r["acc"].append(acc(m, xs, ys)); r["act"].append(h.mean().item())
+            r["zero"].append((h == 0).float().mean().item()); r["ratio"].append(wnorm_ratio(m))
+            if r["acc"][-1] > 0.6:
+                r["weak"].append(fgsm(m, xs, ys, 0.3, MASKS["weak5"]))
+                r["rel"].append(fgsm(m, xs, ys, 0.3, MASKS["reliable"]))
+                r["all"].append(fgsm(m, xs, ys, 0.3, MASKS["all"]))
+        out[lam] = r
+        print("act", lam, ms(r["acc"])[0], sum(a < 0.6 for a in r["acc"]), "collapsed", flush=True)
+    return out
+
+
 if __name__ == "__main__":
     parts = sys.argv[1:] or ["main", "bayes", "reg", "phase", "modelc"]
     res = {}
