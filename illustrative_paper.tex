@@ -9,8 +9,9 @@
 \newcommand{\plain}[1]{\medskip\noindent\fbox{\parbox{0.95\linewidth}{\textbf{In plain words.} #1}}\medskip}
 
 \title{Why Accurate Models Are Easy to Fool:\\
-A Hands-On Tour with a Toy Problem}
-\author{}
+A Hands-On Tour of Adversarial Vulnerability}
+\author{Ali Kayyam\\
+\texttt{akayyam@brainchip.com}}
 \date{}
 
 \begin{document}
@@ -18,17 +19,14 @@ A Hands-On Tour with a Toy Problem}
 \maketitle
 
 \begin{abstract}
-This paper is meant to be \emph{illustrative and tutorial}: a guided, hands-on way to understand the
-possible culprits behind adversarial vulnerability, without needing specialist background. Image classifiers
-can be fooled by changes too small for a person to notice. Why? We build the smallest problem we can where the
-answer can be checked exactly: a task with one reliable clue and five unreliable clues, all of whose properties we
-know. We train a small neural network on it, attack it, and take the problem apart one piece at a time, with each
-section asking one plain question and answering it with a small experiment and a figure. What we find is simpler
-than the usual stories. The network is fooled mainly because it adds up many small pieces of evidence, and an
-attacker who may nudge every input a little can push all of them the same way. No single weak clue is to blame; their sum is.
-We then show which fixes work and what they cost, when the effect appears and when it does not, and where the account holds up
-and where it only partly holds on real images (circles and squares, MNIST, CIFAR-10). It is an aid to intuition, not a
-claim about large deep networks in general.
+This paper is meant to be \emph{illustrative and tutorial}: a hands-on illustration of why distributing predictive evidence across many inputs
+can make a model vulnerable to small per-input ($\ell_\infty$) perturbations, aimed at readers without specialist background. Image classifiers can be fooled by changes too small for a person to notice.
+Two well-known ideas explain parts of this: that networks add up tiny effects across many inputs (Goodfellow et al.), and that they rely on clues that are predictive but fragile (Ilyas et al.).
+We use one controlled toy problem, a task with one reliable clue and five weak clues whose properties we know exactly, as a bridge between the two, taking it apart one piece at a time with a small experiment and a figure per question.
+Keeping the total evidence fixed and spreading it over more inputs leaves accuracy unchanged but makes the per-input change needed to fool the model shrink as one over the square root of the number of inputs (eight times smaller at 64 inputs),
+while the \emph{total} size of the change needed does not move. No single weak clue is to blame; their sum is. A second, perhaps surprising lesson: how \emph{reliable} a clue is does not make it safe; what matters is how \emph{small} it is relative to the nudge,
+so a clue that is $99.9\%$ reliable can still be flipped by a tiny change. We then show which fixes work and what they cost, when the effect appears and when it does not, and where the picture holds up and where it only partly holds on real images
+(circles and squares, MNIST, CIFAR-10). This is an aid to intuition, not a claim about large deep networks in general.
 \end{abstract}
 
 \section{The idea in plain words}
@@ -54,8 +52,8 @@ inherits their fragility.
 reads thousands of numbers. A tiny nudge to each of them, all in the unhelpful direction, adds up to
 a big change in the answer.
 \end{itemize}
-These sound like rivals. In our toy world they turn out to be two views of one mechanism, and the
-experiments below show which parts of each hold up.
+These can sound like rivals. This paper uses a single toy problem as a bridge between them: in it, a clue can be perfectly good evidence and still make the model fragile, simply because the evidence is spread over many small contributions that an attacker can push together.
+The experiments below show which parts of each idea hold up, and where.
 
 \plain{Think of a vote among many voters. If the voters are independent, nudging one of them
 does little. But an attacker who can whisper a tiny bias to \emph{every} voter at once can swing the
@@ -131,7 +129,7 @@ Gray: slots that are always zero (C only).}
 
 \section{How we attack}
 
-The attacker may change each input number by at most a small amount $\epsilon$ (we try $\epsilon$ up to $0.3$). The attacker chooses
+The attacker may change each input number by at most a small amount $\epsilon$ (we try $\epsilon$ up to $0.3$). This is the standard ``per-input'' ($\ell_\infty$) budget; the alternative, a limit on the \emph{total} (straight-line, $\ell_2$) size of the change, will matter in Section~\ref{sec:why}. The attacker chooses
 the direction of each change to hurt the model most, using the model's own gradient (this is the standard one-step FGSM attack).
 We count the share of correctly classified test points whose answer flips. We can also forbid the attacker from touching
 some inputs, which lets us ask \emph{where} the model is vulnerable.
@@ -148,7 +146,58 @@ largest per-run difference is $0.000$); for example $0.536$ against $0.536$ for 
 that hurts most does not change between the clean point and the edge of the allowed box, so there is nothing for extra steps to improve. This is a property of this small
 network and task, not a general fact. On the image network of Section~\ref{sec:real} the iterated attack is stronger than the one-step attack.
 
-\section{Question 1: who does the network listen to?}
+\section{Question 1: what happens when the same evidence is spread over more inputs?}
+\label{sec:why}
+
+When the best rule is a weighted sum $\sum_i w_ix_i$, the smallest change per input that flips an answer is
+\[
+\text{flip size}=\frac{\text{how confident the sum is}}{\sum_i |w_i|}.
+\]
+Each input contributes its own $|w_i|$ to the denominator, so \emph{more inputs carrying the evidence means a smaller flip size}.
+This quantity, the sum of absolute weights $\|w\|_1$, is the whole story for a weighted sum: it is how far the answer moves when
+every input is nudged by one unit in the worst direction. In our task the reliable clue has weight $11.1$ and each weak clue $6.4$,
+so the five weak clues together carry $32.0$, nearly three times as much.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.46\textwidth]{fig_il_weights.pdf}
+\caption{The sum of weights $\sum|w_i|$, which sets how far a full nudge moves the answer. One reliable clue carries $11.1$; the five weak clues, stacked, carry $32.0$.}
+\label{fig:weights}
+\end{figure}
+
+A picture helps (Figure~\ref{fig:geometry}). Draw the allowed changes for two inputs as a square (each input may move by at most $\epsilon$) and the decision boundary as a line. If all the evidence is in one input, the boundary is a vertical line and the
+square must grow until its \emph{side} reaches it. If the same evidence is split over two inputs, the boundary is diagonal, and the square's \emph{corner}, which moves both inputs at once, reaches it sooner. The straight-line distance to the boundary (blue circle) is the same in both cases;
+only the square, the per-input change, shrinks, by $1/\sqrt2$ here and by $1/\sqrt k$ for $k$ inputs.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\textwidth]{fig_il_geometry.pdf}
+\caption{Two inputs, one point. Blue circle: total change needed to reach the decision boundary (black). Red dashed square: per-input change needed. Splitting the evidence over two inputs leaves the circle unchanged and shrinks the square.}
+\label{fig:geometry}
+\end{figure}
+
+\subsection{The same evidence, spread out}
+
+To test this directly we keep the total amount of evidence fixed and split it equally over $k$ inputs, $k=1,2,4,\ldots,64$. A classifier
+with the same accuracy ($95\%$) is built each time.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{fig_rc_dimensions.pdf}
+\caption{Spreading a fixed amount of evidence over more inputs. Right panel: the smallest per-input change that flips an answer
+(median) falls as $1/\sqrt k$ (steep lines) while the \emph{total size} of the change needed (the $\ell_2$ distance, flat lines) stays put.
+Exact best rule (lines) and trained networks (markers) coincide.}
+\label{fig:spread}
+\end{figure}
+
+With $k=1$ the per-input flip size is $0.43$; with $k=64$ it is $0.054$, eight times smaller, at the same accuracy. Measured the other way,
+as the total size of the change (the ordinary straight-line distance), nothing changes: $0.43$ throughout. The trained network follows the exact curve at every $k$.
+
+\plain{Splitting the same information over more inputs makes the model eight times easier to fool when each input may be nudged a little,
+without making it less accurate and without making any individual input more fragile. If instead the attacker is limited by the
+\emph{total} size of the change, there is no difference.}
+
+\section{Question 2: who does the network listen to?}
 \label{sec:listen}
 
 The network (A) reaches $99.4\%$ accuracy, matching the best possible $99.3\%$. But does it use the weak clues the
@@ -181,7 +230,22 @@ networks or training recipes.}
 \label{fig:perm}
 \end{figure}
 
-\section{Question 2: where is the network vulnerable?}
+\subsection{Is it the network's fault?}
+
+We can also attack the \emph{best possible} classifier, which involves no training at all. It is just as vulnerable as the trained one:
+the median per-input flip size is $0.277$ for the best rule and $0.285$ for the network.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.58\textwidth]{fig_rc_ecdf.pdf}
+\caption{Share of test points flipped as the allowed nudge grows. The best possible rule (dashed black) lies on top of the trained network (blue). Networks that see only the five weak clues (orange) or only the reliable clue (green) are shown for comparison.}
+\label{fig:ecdf}
+\end{figure}
+
+\plain{The network is not doing something silly that a better training run would avoid. The fragility belongs to the problem and to the
+kind of attack allowed.}
+
+\section{Question 3: where is the network vulnerable?}
 \label{sec:where}
 
 We attack Model A while allowing the attacker to touch only some inputs.
@@ -270,73 +334,10 @@ attacking one weak clue needs $1.9$ (harder); attacking all five weak clues need
 \plain{No single weak clue is fragile. The weak clues are dangerous \emph{together}, because their small effects pile up when the attacker pushes them
 all the same way. ``Attacks through the weak features work better'' is true only because there are five of them.}
 
-\section{Question 3: why does adding up make things fragile?}
-\label{sec:why}
+\section{Question 4: is a reliable clue a safe clue?}
+\label{sec:small}
 
-When the best rule is a weighted sum $\sum_i w_ix_i$, the smallest change per input that flips an answer is
-\[
-\text{flip size}=\frac{\text{how confident the sum is}}{\sum_i |w_i|}.
-\]
-Each input contributes its own $|w_i|$ to the denominator, so \emph{more inputs carrying the evidence means a smaller flip size}.
-This quantity, the sum of absolute weights $\|w\|_1$, is the whole story for a weighted sum: it is how far the answer moves when
-every input is nudged by one unit in the worst direction. In our task the reliable clue has weight $11.1$ and each weak clue $6.4$,
-so the five weak clues together carry $32.0$, nearly three times as much.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.46\textwidth]{fig_il_weights.pdf}
-\caption{The sum of weights $\sum|w_i|$, which sets how far a full nudge moves the answer. One reliable clue carries $11.1$; the five weak clues, stacked, carry $32.0$.}
-\label{fig:weights}
-\end{figure}
-
-A picture helps (Figure~\ref{fig:geometry}). Draw the allowed changes for two inputs as a square (each input may move by at most $\epsilon$) and the decision boundary as a line. If all the evidence is in one input, the boundary is a vertical line and the
-square must grow until its \emph{side} reaches it. If the same evidence is split over two inputs, the boundary is diagonal, and the square's \emph{corner}, which moves both inputs at once, reaches it sooner. The straight-line distance to the boundary (blue circle) is the same in both cases;
-only the square, the per-input change, shrinks, by $1/\sqrt2$ here and by $1/\sqrt k$ for $k$ inputs.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.9\textwidth]{fig_il_geometry.pdf}
-\caption{Two inputs, one point. Blue circle: total change needed to reach the decision boundary (black). Red dashed square: per-input change needed. Splitting the evidence over two inputs leaves the circle unchanged and shrinks the square.}
-\label{fig:geometry}
-\end{figure}
-
-\subsection{The same evidence, spread out}
-
-To test this directly we keep the total amount of evidence fixed and split it equally over $k$ inputs, $k=1,2,4,\ldots,64$. A classifier
-with the same accuracy ($95\%$) is built each time.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.98\textwidth]{fig_rc_dimensions.pdf}
-\caption{Spreading a fixed amount of evidence over more inputs. Right panel: the smallest per-input change that flips an answer
-(median) falls as $1/\sqrt k$ (steep lines) while the \emph{total size} of the change needed (the $\ell_2$ distance, flat lines) stays put.
-Exact best rule (lines) and trained networks (markers) coincide.}
-\label{fig:spread}
-\end{figure}
-
-With $k=1$ the per-input flip size is $0.43$; with $k=64$ it is $0.054$, eight times smaller, at the same accuracy. Measured the other way,
-as the total size of the change (the ordinary straight-line distance), nothing changes: $0.43$ throughout. The trained network follows the exact curve at every $k$.
-
-\plain{Splitting the same information over more inputs makes the model eight times easier to fool when each input may be nudged a little,
-without making it less accurate and without making any individual input more fragile. If instead the attacker is limited by the
-\emph{total} size of the change, there is no difference.}
-
-\subsection{A property of the problem, not of the network}
-
-We can also attack the \emph{best possible} classifier, which involves no training at all. It is just as vulnerable as the trained one:
-the median per-input flip size is $0.277$ for the best rule and $0.285$ for the network.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.58\textwidth]{fig_rc_ecdf.pdf}
-\caption{Share of test points flipped as the allowed nudge grows. The best possible rule (dashed black) lies on top of the trained network (blue). Networks that see only the five weak clues (orange) or only the reliable clue (green) are shown for comparison.}
-\label{fig:ecdf}
-\end{figure}
-
-\plain{The network is not doing something silly that a better training run would avoid. The fragility belongs to the problem and to the
-kind of attack allowed.}
-
-\subsection{Small clues, not unreliable clues}
+It is natural to think: if a clue is $99.9\%$ predictive of the label, surely it must be robust. It is not. Reliability (how well a clue predicts the label) and fragility (how small a nudge flips it) are different quantities, and the second depends on the clue's \emph{size} relative to the nudge.
 
 ``Weak'' has so far meant ``unreliable.'' But the notion of ``non-robust'' in the original theory is about a clue being \emph{small} relative to the
 nudge, not unreliable. To separate the two, we took a single clue and varied them independently: its \emph{size} (the gap between the two
@@ -370,7 +371,8 @@ more reliable does not make it safer; if anything, a nearly perfectly reliable c
 size is just the distance to the decision boundary, and a very reliable clue puts almost every point about half the class gap from it, while a less reliable
 clue leaves some points farther away. A tiny clue that is 99.9\% reliable can be flipped by a nudge of $0.025$.}
 
-\section{Question 4: can we fix it?}
+
+\section{Question 5: can we fix it?}
 \label{sec:fix}
 
 \paragraph{Remove the weak clues.} Model B, which never sees them, is much harder to fool at large nudge sizes: $0.211$ flipped at $\epsilon=0.3$ against
@@ -464,7 +466,7 @@ A single run would therefore either miss the collapse or mistake it for typical.
 \plain{Every fix that works does the same thing: it reduces the sum of weights by giving up some of the weak clues' information, so robustness is paid for in accuracy.
 Penalising the \emph{input weights} lets the model drop whole clues; shrinking everything a little, or penalising hidden \emph{activity}, does not, and the latter breaks networks all at once.}
 
-\section{Question 5: when does this happen at all?}
+\section{Question 6: when does this happen at all?}
 \label{sec:when}
 
 We retrained the network over a grid of how noisy the reliable clue is, how strong the weak clues are, and how much weight decay is used.
@@ -577,10 +579,10 @@ large deep networks on natural data work this way.}
 \section{Takeaways and limits}
 
 \begin{enumerate}
-\item A network is fooled mainly because it \emph{adds up many small pieces of evidence} and the attacker may nudge all of them.
+\item Spreading the same predictive evidence over more inputs makes a model easy to fool when each input may be nudged a little ($\ell_\infty$): the per-input change needed shrinks like $1/\sqrt k$, while the total change needed and the accuracy do not move.
+\item How \emph{reliable} a clue is does not make it safe; how \emph{small} it is relative to the nudge does. A $99.9\%$-reliable clue can be flipped by a tiny change.
 \item Weak clues are not useless, and no single weak clue is the culprit; the vulnerability is in the sum.
 \item In this task it is a property of the problem and the attack rule, not a flaw in training: the best possible classifier is just as vulnerable.
-\item ``Small'' (relative to the nudge), not ``unreliable'', is what makes a clue fragile.
 \item Fixes work by throwing away information, and cost accuracy; switching whole inputs off works better than shrinking everything, and concentrating on one clue creates a new single point of failure.
 \item Sparsity of the \emph{weights} helps; sparsity of the \emph{activity} does not, and breaks networks all at once.
 \item Always judge the nudge against the size of the clue, and beware near-perfect clues, which can hide the effect entirely.
@@ -626,7 +628,8 @@ Figure~\ref{fig:mnistadv} uses the unmixed MNIST network below, with the smalles
 \item[Adversarial example] An input changed slightly, on purpose, so that a model gets it wrong.
 \item[Clue / feature] A number the model reads. \emph{Reliable} if it alone predicts the label well; \emph{weak} if not; \emph{small} if its two class averages are close
 compared with the allowed nudge.
-\item[Nudge size $\epsilon$] The most the attacker may change each input.
+\item[Nudge size $\epsilon$ ($\ell_\infty$)] The most the attacker may change each input; a ``per-input'' budget.
+\item[Total change ($\ell_2$)] The straight-line size of the whole change taken together; a different budget, under which spreading evidence does not make a model easier to fool.
 \item[Flip size] The smallest nudge size at which a given answer flips.
 \item[Best possible (Bayes-optimal) classifier] The rule with the highest achievable accuracy given how the data were generated.
 \item[$L_1$, group Lasso, $L_2$] Training penalties on the model's weights. $L_1$ and group Lasso push whole inputs to zero; $L_2$ ordinary weight decay shrinks everything.
