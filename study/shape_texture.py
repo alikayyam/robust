@@ -5,6 +5,7 @@ Exp 2: both a shape-like cue (smooth local blob) and a texture-like cue (full-im
 Results -> study/results/shape_texture.pkl"""
 import pickle, sys
 import numpy as np, torch, torch.nn as nn
+from scipy.stats import norm
 sys.path.insert(0, "/home/akayyam/adv_reason")
 import root_cause_experiments as rce
 torch.set_num_threads(1)
@@ -95,7 +96,8 @@ def exp2(seeds=3):
             xc = z + 0.5 * aL * tl - 0.5 * aH * th
             with torch.no_grad(): p = m(xc).argmax(1)
             row["follow_shape"].append((p == 1).float().mean().item())
-            wb = (aL * tl - aH * th) / SIGMA ** 2; row["bayes_follow_shape"].append(((xc @ wb) > 0).float().mean().item())  # Bayes weights: dominated by the stronger cue
+            # best rule's weights are the true ones (aL*tl + aH*th)/SIGMA^2; its conflict preference has this closed form (templates are ~orthonormal)
+            row["bayes_follow_shape"].append(float(norm.cdf(0.5 * (aL ** 2 - aH ** 2) / (SIGMA * np.sqrt(aL ** 2 + aH ** 2)))))
             # where does a worst-case l_inf nudge put its energy? project onto each template
             d = fgsm_delta(m, xs, ys, 0.1); dl, dh = (d @ tl).abs(), (d @ th).abs(); tot = d.norm(dim=1)
             row["adv_low_frac"].append((dl / tot).mean().item()); row["adv_high_frac"].append((dh / tot).mean().item())
