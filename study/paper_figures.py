@@ -82,3 +82,34 @@ axs[1].bar(np.arange(4) - w / 2, bay, w, color="#7f7f7f", label="best rule"); ax
 axs[1].set_xticks(range(4)); axs[1].set_xticklabels([f"shape {a}\ntexture {b}" for a, b in conds], fontsize=7); axs[1].set_ylabel("share labelled by the shape cue"); axs[1].axhline(0.5, color=K, lw=0.6, ls=":"); axs[1].legend(fontsize=7, frameon=False); fin(axs[1])
 fig.tight_layout(); fig.savefig(F + "h3_shape_texture.pdf")
 print({c: round(e2["rows"][c]["inf"], 3) for c in conds}, [round(b, 3) for b in bay])
+
+# ---------------- real-data figures
+LR = lambda n: pickle.load(open(R + f"real_{n}.pkl", "rb"))
+r8, r4, r7, r6, r2 = LR("r8"), LR("r4a"), LR("r7"), LR("r6"), LR("r2b")
+fig, axs = plt.subplots(1, 3, figsize=(11.2, 3.3))
+ds = ["mnist", "fmnist", "cifar"]; dl = ["MNIST", "Fashion-\nMNIST", "CIFAR-10"]; w = 0.35
+axs[0].bar(np.arange(3) - w / 2, [r8[d]["ratio_measured"] for d in ds], w, color=RED, label="measured"); axs[0].bar(np.arange(3) + w / 2, [r8[d]["ratio_predicted"] for d in ds], w, color="#7f7f7f", label="linear prediction")
+axs[0].set_xticks(range(3)); axs[0].set_xticklabels(dl); axs[0].set_ylabel("random-noise size / worst-case size"); axs[0].set_title("noise vs worst case", fontsize=9); axs[0].legend(fontsize=7, frameon=False)
+for j, (k, lab, col) in enumerate([("base_inf", "no extra inputs", "#7f7f7f"), ("real_only", "attack real pixels only", B), ("noise_only", "attack the 784 noise inputs only", O), ("all", "attack all", RED)]):
+    axs[1].bar(np.arange(2) + (j - 1.5) * 0.2, [r4[d][k] for d in ["mnist", "fmnist"]], 0.2, color=col, label=lab)
+axs[1].set_xticks(range(2)); axs[1].set_xticklabels(["MNIST", "Fashion-MNIST"]); axs[1].set_ylabel(r"median $\ell_\infty$ flip size"); axs[1].set_title("irrelevant inputs added", fontsize=9); axs[1].legend(fontsize=6, frameon=False)
+for j, (d, n) in enumerate([("mnist", 100), ("fmnist", 100)]):
+    axs[2].bar(j - 0.18, r7[(d, n)]["svm_rad"], 0.36, color=O, label=r"$\ell_2$ max-margin" if j == 0 else None); axs[2].bar(j + 0.18, r7[(d, n)]["lp_rad"], 0.36, color=G, label=r"$\ell_\infty$ max-margin" if j == 0 else None)
+    axs[2].text(j - 0.18, r7[(d, n)]["svm_rad"] + 0.003, f"acc {r7[(d, n)]['svm_acc']:.2f}", ha="center", fontsize=6); axs[2].text(j + 0.18, r7[(d, n)]["lp_rad"] + 0.003, f"acc {r7[(d, n)]['lp_acc']:.2f}", ha="center", fontsize=6)
+axs[2].set_xticks(range(2)); axs[2].set_xticklabels(["MNIST 3 vs 7", "Fashion-MNIST\nT-shirt vs shirt"]); axs[2].set_ylabel(r"median $\ell_\infty$ flip size (100 examples)"); axs[2].set_title("which max-margin solution", fontsize=9); axs[2].legend(fontsize=7, frameon=False)
+for a in axs: fin(a)
+fig.tight_layout(); fig.savefig(F + "real_a.pdf")
+
+fig, axs = plt.subplots(1, 3, figsize=(11.2, 3.3))
+for ax, d in zip(axs[:2], ["mnist", "cifar"]):
+    ns = sorted(n for (dd, n) in r6 if dd == d)
+    ax.plot(ns, [r6[(d, n)]["inf"] for n in ns], "o-", color=B); ax.set_xscale("log"); ax.set_xlabel("training examples"); ax.set_ylabel(r"median $\ell_\infty$ flip size", color=B)
+    a2 = ax.twinx(); a2.plot(ns, [r6[(d, n)]["acc"] for n in ns], "s--", color=G); a2.set_ylabel("accuracy", color=G); a2.set_ylim(0, 1); ax.set_title({"mnist": "MNIST (fully connected)", "cifar": "CIFAR-10 (convolutional)"}[d], fontsize=9); ax.set_ylim(0, None); fin(ax); a2.spines[["top"]].set_visible(False)
+for i, (d, es) in enumerate([("mnist", [0.1, 0.2, 0.3]), ("cifar", [0.03, 0.1])]):
+    for j, e in enumerate(es):
+        x0 = i * 3.6 + j
+        axs[2].bar(x0 - 0.18, np.mean(r2[d][e]["adv"]), 0.36, color=B, label="adversarial changes only" if (i == 0 and j == 0) else None)
+        axs[2].bar(x0 + 0.18, np.mean(r2[d][e]["noise"]), 0.36, color="#7f7f7f", label="random-noise control" if (i == 0 and j == 0) else None)
+axs[2].set_xticks([0, 1, 2, 3.6, 4.6]); axs[2].set_xticklabels(["MNIST\n0.1", "0.2", "0.3", "CIFAR-10\n0.03", "0.1"], fontsize=7); axs[2].axhline(0.1, color=K, ls="--", lw=0.8); axs[2].set_ylabel("clean accuracy, true labels"); axs[2].set_title("transfer test (chance = 0.1)", fontsize=9); axs[2].legend(fontsize=7, frameon=False); fin(axs[2])
+fig.tight_layout(); fig.savefig(F + "real_b.pdf")
+print("real figs ok")
