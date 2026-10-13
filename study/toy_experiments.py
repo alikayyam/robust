@@ -211,5 +211,64 @@ def run_h7():
     save("h7", res); return res
 
 
+
+# ------------------------------------------------------------------ H7b: real gradient descent instead of the SVM stand-in
+def run_h7gd():
+    d = 100; n = 60; dp = 3.3; steps = 20000; lr = 0.5
+    ss = [1, 3, 10, 30, 100]
+    res = {"ss": ss, "acc_gd": {}, "rad_gd": {}, "cos_svm": {}, "acc_svm": {}, "rad_svm": {}}
+    for s_ in ss:
+        for k in ["acc_gd", "rad_gd", "cos_svm", "acc_svm", "rad_svm"]: res[k][s_] = []
+        gap = dp / math.sqrt(s_)
+        for sd in SEEDS:
+            rng = np.random.default_rng(100 * sd + s_)
+            def mk(m):
+                y = rng.integers(0, 2, m) * 2 - 1
+                x = rng.standard_normal((m, d)); x[:, :s_] += (y[:, None] * 0.5) * gap
+                return x, y
+            xt, yt = mk(n); xs, ys = mk(2000)
+            w = np.zeros(d); yx = yt[:, None] * xt
+            for _ in range(steps):
+                z = np.clip(yx @ w, -50, 50)
+                w += lr * (yx * (1 / (1 + np.exp(z)))[:, None]).mean(0)
+            svm = SVC(kernel="linear", C=1e6).fit(xt, yt).coef_[0]
+            res["acc_gd"][s_].append(float(((xs @ w > 0) * 2 - 1 == ys).mean())); res["rad_gd"][s_].append(linf_radius(w, xs, ys))
+            res["acc_svm"][s_].append(float(((xs @ svm > 0) * 2 - 1 == ys).mean())); res["rad_svm"][s_].append(linf_radius(svm, xs, ys))
+            res["cos_svm"][s_].append(float(w @ svm / (np.linalg.norm(w) * np.linalg.norm(svm))))
+        print("h7gd", s_, {k: round(float(np.nanmean(res[k][s_])), 3) for k in res if k != "ss"}, flush=True)
+    save("h7gd", res); return res
+
+
+
+# ------------------------------------------------------------------ H2b: are adversarial perturbations themselves predictive features?
+def targeted_pgd(model, x, t, eps, steps=20):
+    delta = torch.zeros_like(x)
+    for _ in range(steps):
+        d = delta.clone().requires_grad_(True)
+        loss = torch.nn.functional.cross_entropy(model(x + d), t)          # descend: make the model answer t
+        g = torch.autograd.grad(loss, d)[0]
+        delta = (delta - (eps / 4) * g.sign()).clamp(-eps, eps).detach()
+    return x + delta
+
+
+def run_h2b():
+    """Ilyas-style test on the toy: build a training set from (perturbed input, RANDOM target label) where the perturbation is a
+    targeted adversarial change; train a fresh network on it; test on clean data with TRUE labels. Control: same-size random-sign noise."""
+    dmu = torch.tensor([1.0] + [0.4] * 5); sigma = torch.tensor([0.3] + [0.25] * 5)
+    epss = [0.05, 0.1, 0.2, 0.3]
+    res = {"eps": epss, "adv": {e: [] for e in epss}, "noise": {e: [] for e in epss}, "clean_ref": [], "reliable_w": {e: [] for e in epss}}
+    for s in SEEDS:
+        g = gen_for(s, 7); xt, yt = rce.make_data(4000, dmu, sigma, g); xs, ys = rce.make_data(2000, dmu, sigma, g)
+        torch.manual_seed(s); m0 = rce.train_mlp(xt, yt); res["clean_ref"].append(rce.accuracy(m0, xs, ys))
+        t = torch.randint(0, 2, (4000,), generator=g)
+        for e in epss:
+            xa = targeted_pgd(m0, xt, t, e).detach()
+            torch.manual_seed(s); m1 = rce.train_mlp(xa, t); res["adv"][e].append(rce.accuracy(m1, xs, ys))
+            xn = xt + e * (torch.randint(0, 2, xt.shape, generator=g).float() * 2 - 1)
+            torch.manual_seed(s); m2 = rce.train_mlp(xn, t); res["noise"][e].append(rce.accuracy(m2, xs, ys))
+        print("h2b seed", s, {e: round(res["adv"][e][-1], 3) for e in epss}, flush=True)
+    save("h2b", res); return res
+
+
 if __name__ == "__main__":
     for name in sys.argv[1:]: globals()["run_" + name]()
