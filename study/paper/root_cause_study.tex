@@ -30,7 +30,7 @@ Checks on MNIST, Fashion-MNIST and CIFAR-10 confirm several of these effects (ir
 
 \section{The puzzle and a way to organise the answer}
 
-A faint pattern of noise, invisible to a person, makes an accurate image classifier change its answer. Adversarial training and other defences now make models much more robust, but we still lack a clear account of \emph{why} ordinary models are fragile in the first place. The literature offers many candidate causes; each is usually shown on its own, on a different dataset, with a different measure.
+A faint pattern of noise, invisible to a person, makes an accurate image classifier change its answer. Adversarial training and other defences now make models much more robust, but we still lack a clear account of \emph{why} ordinary models are fragile in the first place. The literature offers many candidate causes~\cite{szegedy2014,goodfellow2015,tsipras2019,ilyas2019,geirhos2019}; each is usually shown on its own, on a different dataset, with a different measure.
 
 We do two things. First, we compare candidate causes in the same small, fully controlled worlds with the same measure. Second, we sort what we find using one distinction.
 
@@ -62,7 +62,7 @@ This one formula organises most of what follows. It is exact for the best rule; 
 \subsection{H1: evidence added up over many inputs}
 \label{sec:h1}
 
-\textbf{Claim} (Goodfellow et al.): a small change to every input, all in the unhelpful direction, adds up. \textbf{Experiment:} keep the total evidence fixed and split it equally over $k=1,2,\ldots,64$ inputs, so accuracy stays at $95\%$.
+\textbf{Claim} (Goodfellow et al.~\cite{goodfellow2015}; see also Simon-Gabriel et al.~\cite{simongabriel2019}): a small change to every input, all in the unhelpful direction, adds up. \textbf{Experiment:} keep the total evidence fixed and split it equally over $k=1,2,\ldots,64$ inputs, so accuracy stays at $95\%$.
 
 \begin{figure}[H]
 \centering
@@ -78,7 +78,7 @@ The per-input flip size falls from $0.43$ at $k=1$ to $0.054$ at $k=64$ (a facto
 \subsection{H2: small clues, not unreliable ones}
 \label{sec:h2}
 
-\textbf{Claim} (Ilyas et al.): networks rely on features that are predictive but fragile. \textbf{Experiment:} one clue; vary its size (gap between class averages) and its reliability independently.
+\textbf{Claim} (Ilyas et al.~\cite{ilyas2019}): networks rely on features that are predictive but fragile. \textbf{Experiment:} one clue; vary its size (gap between class averages) and its reliability independently.
 
 \begin{figure}[H]
 \centering
@@ -91,7 +91,7 @@ Flip size is proportional to the clue's size. Raising reliability from $77\%$ to
 
 \plain{``Non-robust'' means small relative to the allowed change, not unreliable. Inevitable (a property of the data). Still to do: the transfer test (do changes crafted against a small-scale-feature model fool a large-scale-feature model?).}
 
-\paragraph{Transfer test: are adversarial changes made of real features?} Ilyas et al.\ showed that a network trained only on adversarially changed images, with labels given by the \emph{target} of the change, can still classify clean images. We repeat this in miniature. For each training point we craft a targeted change of size $\epsilon$ towards a randomly chosen target label and keep the changed input with that target label. The labels are random with respect to the true class, so a fresh network can do well on clean data only if the changes themselves carry features.
+\paragraph{Transfer test: are adversarial changes made of real features?} Ilyas et al.~\cite{ilyas2019} showed that a network trained only on adversarially changed images, with labels given by the \emph{target} of the change, can still classify clean images. We repeat this in miniature. For each training point we craft a targeted change of size $\epsilon$ towards a randomly chosen target label and keep the changed input with that target label. The labels are random with respect to the true class, so a fresh network can do well on clean data only if the changes themselves carry features.
 
 \begin{figure}[H]
 \centering
@@ -129,7 +129,7 @@ The best rule's flip size falls as $1/\sqrt s$ (from $0.43$ at $s=1$ to $0.054$ 
 \subsection{H8: random noise versus the worst case}
 \label{sec:h8}
 
-\textbf{Claim} (Ford et al.): adversarial examples are the far tail of ordinary sensitivity to noise. \textbf{Experiment:} for the best rule, compare the size of random $\pm$ noise needed to flip a quarter of the points with the size of the worst-case change.
+\textbf{Claim} (Ford et al.~\cite{ford2019}): adversarial examples are the far tail of ordinary sensitivity to noise. \textbf{Experiment:} for the best rule, compare the size of random $\pm$ noise needed to flip a quarter of the points with the size of the worst-case change.
 
 \begin{figure}[H]
 \centering
@@ -156,12 +156,12 @@ Here we ask directly how much vulnerability is inevitable. For a linear rule wit
 
 At $\epsilon=0.3$ the ceiling is $0.75$ (reached by using the reliable clue only), while the best clean rule gets $0.42$ and the trained network $0.45$. The ceiling itself falls as $\epsilon$ grows ($0.63$ at $\epsilon=0.4$): part of the loss is inevitable. The gap between ceiling and network, about $0.3$ at $\epsilon=0.3$, is avoidable, yet \emph{standard training will not close it}, because the standard objective rewards the clean-optimal rule. For small $\epsilon$ ($\le0.1$) the two coincide.
 
-\plain{Both parts are real. The ceiling is inevitable. The gap is avoidable by changing the objective, which is the accuracy/robustness trade-off in numbers. We do not study adversarial training here. The ceiling is for linear rules only.}
+\plain{Both parts are real. The ceiling is inevitable. The gap is avoidable by changing the objective, which is the accuracy/robustness trade-off of Tsipras et al.~\cite{tsipras2019} in numbers. We do not study adversarial training here. The ceiling is for linear rules only.}
 
 \subsection{H7: which solution the optimiser reaches}
 \label{sec:h7}
 
-Gradient descent on separable data is known to head for the solution with the largest margin measured in $\ell_2$, not in $\ell_\infty$. \textbf{Experiment:} 100 inputs, $s$ of them informative, 60 training examples (so the data are separable). Compare the $\ell_2$ max-margin classifier (we use an SVM as the stand-in for the gradient-descent limit) with the $\ell_\infty$ max-margin classifier (a linear programme) and the oracle best rule.
+Gradient descent on separable data is known to head for the solution with the largest margin measured in $\ell_2$, not in $\ell_\infty$ (Soudry et al.~\cite{soudry2018}). \textbf{Experiment:} 100 inputs, $s$ of them informative, 60 training examples (so the data are separable). Compare the $\ell_2$ max-margin classifier (we use an SVM as the stand-in for the gradient-descent limit) with the $\ell_\infty$ max-margin classifier (a linear programme) and the oracle best rule.
 
 \begin{figure}[H]
 \centering
@@ -179,7 +179,7 @@ We checked the stand-in directly: 20\,000 steps of gradient descent on the logis
 \subsection{H6: more data}
 \label{sec:h6}
 
-\textbf{Claim} (Schmidt et al.): robust generalisation needs more data. \textbf{Experiment (standard training only):} train on $n=30$ to $4000$ examples, with the evidence spread over 16 inputs.
+\textbf{Claim} (Schmidt et al.~\cite{schmidt2018}): robust generalisation needs more data. \textbf{Experiment (standard training only):} train on $n=30$ to $4000$ examples, with the evidence spread over 16 inputs.
 
 \begin{figure}[H]
 \centering
@@ -195,7 +195,7 @@ Accuracy rises from $0.905$ to $0.953$, but the flip size equals the best rule's
 \subsection{H5: directions the data never use}
 \label{sec:h5}
 
-\textbf{Claim} (Gilmer et al.; Stutz et al.): networks are sensitive in directions off the data manifold, where training gives no signal. \textbf{Experiment:} data lie on a 4-dimensional subspace of a 64-dimensional space (plus small off-subspace noise). Attack only along the subspace, or only across it.
+\textbf{Claim} (Gilmer et al.~\cite{gilmer2018}; Stutz et al.~\cite{stutz2019}): networks are sensitive in directions off the data manifold, where training gives no signal. \textbf{Experiment:} data lie on a 4-dimensional subspace of a 64-dimensional space (plus small off-subspace noise). Attack only along the subspace, or only across it.
 
 \begin{figure}[H]
 \centering
@@ -211,7 +211,7 @@ With weight decay the network ignores off-manifold directions entirely (no flip 
 \subsection{H3: shape versus texture}
 \label{sec:h3}
 
-\textbf{Claim} (Geirhos et al.): networks lean on texture (fine, high-frequency patterns) more than people do, and texture reliance makes them fragile. \textbf{World:} $16\times16$ images with Gaussian pixel noise. A cue is a fixed pattern added with a class-dependent sign; its strength, and hence the accuracy it supports ($\approx95\%$), is set exactly.
+\textbf{Claim} (Geirhos et al.~\cite{geirhos2019}; for frequency, Yin et al.~\cite{yin2019}): networks lean on texture (fine, high-frequency patterns) more than people do, and texture reliance makes them fragile. \textbf{World:} $16\times16$ images with Gaussian pixel noise. A cue is a fixed pattern added with a class-dependent sign; its strength, and hence the accuracy it supports ($\approx95\%$), is set exactly.
 
 \paragraph{Experiment 1: frequency or spread?} Four cues of equal strength: \emph{smooth} or \emph{fine} (a checkerboard), each \emph{spread} over the whole image or \emph{concentrated} in the middle. We report the cue's spread as the $\ell_1/\ell_2$ ratio of its pattern ($14.4$, $7.1$, $16.0$, $7.1$).
 
@@ -302,7 +302,7 @@ H9: fully connected / convolutional ($\ell_\infty$) & MNIST & $0.045$ & $0.088$ 
 
 \plain{Real data mostly confirm the toy mechanisms and the avoidable effects: noise versus worst case (same order), irrelevant inputs (about $1.8\times$), optimiser bias ($+50\%$), and transfer. They qualify others: more data does not help (and on CIFAR-10 the flip size falls with accuracy, the accuracy--robustness trade-off), off-manifold sensitivity is a CIFAR-10 effect, high-frequency fragility is not found, and a better architecture is not consistently more robust. Caveats: small networks, standard training, few runs.}
 
-Two earlier checks complete the picture. Mixing the pixels of MNIST digits with a random rotation (same information, same total distances) leaves total flip size unchanged but shrinks per-input flip size by only $12$--$14\%$, not the eightfold drop of the toy world: pixel data are already in the spread-out regime. On CIFAR-10, letting the network use more principal components raises accuracy ($44\%\to78\%$) and shrinks \emph{both} flip sizes by about $7$--$8\times$, so that loss is a shrinking margin, not spreading. A pilot comparing the networks with nearest-neighbour classifiers shows why ``a robust classifier exists'' is hard to establish in $\ell_\infty$: on raw pixels every pair of images is almost equally far apart (nearest same-class and other-class distances are both about $0.99$ on MNIST).
+Two earlier checks complete the picture. Mixing the pixels of MNIST digits with a random rotation (same information, same total distances) leaves total flip size unchanged but shrinks per-input flip size by only $12$--$14\%$, not the eightfold drop of the toy world: pixel data are already in the spread-out regime. On CIFAR-10, letting the network use more principal components raises accuracy ($44\%\to78\%$) and shrinks \emph{both} flip sizes by about $7$--$8\times$, so that loss is a shrinking margin, not spreading. A pilot comparing the networks with nearest-neighbour classifiers shows why ``a robust classifier exists'' is hard to establish in $\ell_\infty$ (compare the separation argument of Yang et al.~\cite{yang2020}): on raw pixels every pair of images is almost equally far apart (nearest same-class and other-class distances are both about $0.99$ on MNIST).
 
 \section{Scorecard}
 \label{sec:score}
@@ -312,7 +312,7 @@ Two earlier checks complete the picture. Mixing the pixels of MNIST digits with 
 \caption{Scorecard. ``Role'': necessary (N), sufficient (S), contributes (C), not supported (--). ``Kind'': inevitable (I) or avoidable (A).}
 \label{tab:score}
 \footnotesize
-\begin{tabular}{p{2.4cm}p{1.0cm}p{1.0cm}p{5.0cm}p{5.0cm}}
+\begin{tabular}{p{2.3cm}p{1.0cm}p{1.0cm}p{4.7cm}p{4.7cm}}
 \toprule
 Hypothesis & Role & Kind & Toy world & Real data \\
 \midrule
@@ -321,12 +321,12 @@ H2 small, not unreliable & N, S & I & flip size $\propto$ size; adversarial chan
 H4a dense signal / irrelevant inputs & S / C & I / A & dense: same as H1; network up to $2\times$ worse than best rule with irrelevant inputs & appended noise inputs: $1.8\times$ smaller flip size (MNIST), $1.7\times$ (Fashion-MNIST) \\
 H4b weight sparsity & fix & A & removes fragility at an accuracy cost & not tested \\
 H4c activity sparsity & -- & -- & no effect; fails all at once & not tested \\
-H8 noise sensitivity & restatement of H1 & I & ratio $\propto\sqrt k$ & ratio $16$--$24$, linear prediction $29$--$56$ \\
+H8 noise sensitivity & (H1) & I & restates H1: ratio $\propto\sqrt k$ & ratio $16$--$24$, linear prediction $29$--$56$ \\
 H10 objective & C & A (new objective) & ceiling $0.75$ vs standard $0.45$ at $\epsilon=0.3$ & not testable without adversarial training \\
 H7 optimiser bias & C & A & $\ell_\infty$ max-margin better when signal sparse, data scarce; gradient descent matches SVM & $\ell_\infty$ solution: $+54\%$ (MNIST), $+58\%$ (Fashion-MNIST) flip size, higher accuracy \\
 H6 data quantity & -- & -- & no effect under standard training & MNIST flat; CIFAR-10 flip size falls as accuracy rises \\
 H5 off-manifold & C (small) & A & vanishes with weight decay; $\sim20\%$ without & CIFAR-10: $4\times$ more sensitive off top PCs; MNIST: not \\
-H3 shape vs texture & C (via spread) & I (spread), A (architecture) & best rule: flip size $\times$ spread constant, frequency irrelevant; CNN weak on fine patterns, shape-biased & no special high-frequency fragility (MNIST less, CIFAR-10 equal) \\
+H3 shape vs texture & C & I, A & spread is inevitable (best rule: flip size $\times$ spread constant, frequency irrelevant); architecture is avoidable (CNN weak on fine patterns, shape-biased) & no special high-frequency fragility (MNIST less, CIFAR-10 equal) \\
 H9 architecture & C & A & invariance: $4$--$5\times$ flip size over fully connected, $1.6\times$ below hand-built filter & MNIST $2\times$ better; Fashion-MNIST equal; CIFAR-10 smaller flip size \\
 \bottomrule
 \end{tabular}
@@ -348,9 +348,20 @@ Independent Gaussian clues, small networks, one-step and projected attacks, no a
 
 Toy task: independent Gaussian clues, mean $(y-\tfrac12)\Delta\mu_i$, standard deviation $\sigma_i$, unclipped; reliable clue $\Delta\mu=1.0$, $\sigma=0.3$; weak clues $\Delta\mu=0.4$, $\sigma=0.25$. Networks: one hidden layer of 8 units (32 in H5), Adam with learning rate $0.02$, 500 full-batch steps, weight decay $10^{-2}$ unless stated, $4000$ training and $2000$ test points, 10 runs. Flip size: exact for linear rules, per-point bisection over a 20-step attack for networks. Code: \texttt{study/toy\_experiments.py} (H4a, H5--H8, H10), \texttt{study/shape\_texture.py} (H3), \texttt{study/invariance.py} (H9), the H2 transfer test (\texttt{run\_h2b}) and the gradient-descent check for H7 (\texttt{run\_h7gd}) in \texttt{study/toy\_experiments.py}, \texttt{study/pilot\_gap.py}, figures from \texttt{study/paper\_figures.py}; H1 and H4b--c use the earlier scripts in the repository root, and the real-data checks are in \texttt{study/real\_checks.py} (functions \texttt{r2b}, \texttt{r3}, \texttt{r4a}, \texttt{r5}--\texttt{r9}).
 
-\begin{thebibliography}{9}
+\begin{thebibliography}{99}
+\bibitem{szegedy2014} C.~Szegedy, W.~Zaremba, I.~Sutskever, J.~Bruna, D.~Erhan, I.~Goodfellow, R.~Fergus. \emph{Intriguing properties of neural networks}. ICLR, 2014.
 \bibitem{goodfellow2015} I.~Goodfellow, J.~Shlens, C.~Szegedy. \emph{Explaining and Harnessing Adversarial Examples}. ICLR, 2015.
+\bibitem{tsipras2019} D.~Tsipras, S.~Santurkar, L.~Engstrom, A.~Turner, A.~Madry. \emph{Robustness May Be at Odds with Accuracy}. ICLR, 2019.
 \bibitem{ilyas2019} A.~Ilyas, S.~Santurkar, D.~Tsipras, L.~Engstrom, B.~Tran, A.~Madry. \emph{Adversarial Examples Are Not Bugs, They Are Features}. NeurIPS, 2019.
+\bibitem{geirhos2019} R.~Geirhos, P.~Rubisch, C.~Michaelis, M.~Bethge, F.~A.~Wichmann, W.~Brendel. \emph{ImageNet-trained CNNs are biased towards texture; increasing shape bias improves accuracy and robustness}. ICLR, 2019.
+\bibitem{yin2019} D.~Yin, R.~G.~Lopes, J.~Shlens, E.~D.~Cubuk, J.~Gilmer. \emph{A Fourier Perspective on Model Robustness in Computer Vision}. NeurIPS, 2019.
+\bibitem{ford2019} N.~Ford, J.~Gilmer, N.~Carlini, E.~D.~Cubuk. \emph{Adversarial Examples Are a Natural Consequence of Test Error in Noise}. ICML, 2019.
+\bibitem{schmidt2018} L.~Schmidt, S.~Santurkar, D.~Tsipras, K.~Talwar, A.~Madry. \emph{Adversarially Robust Generalization Requires More Data}. NeurIPS, 2018.
+\bibitem{gilmer2018} J.~Gilmer, L.~Metz, F.~Faghri, S.~S.~Schoenholz, M.~Raghu, M.~Wattenberg, I.~Goodfellow. \emph{Adversarial Spheres}. ICLR Workshop, 2018.
+\bibitem{stutz2019} D.~Stutz, M.~Hein, B.~Schiele. \emph{Disentangling Adversarial Robustness and Generalization}. CVPR, 2019.
+\bibitem{soudry2018} D.~Soudry, E.~Hoffer, M.~S.~Nacson, S.~Gunasekar, N.~Srebro. \emph{The Implicit Bias of Gradient Descent on Separable Data}. JMLR, 2018.
+\bibitem{simongabriel2019} C.-J.~Simon-Gabriel, Y.~Ollivier, L.~Bottou, B.~Sch\"olkopf, D.~Lopez-Paz. \emph{First-order Adversarial Vulnerability of Neural Networks and Input Dimension}. ICML, 2019.
+\bibitem{yang2020} Y.-Y.~Yang, C.~Rashtchian, H.~Zhang, R.~Salakhutdinov, K.~Chaudhuri. \emph{A Closer Look at Accuracy vs. Robustness}. NeurIPS, 2020.
 \end{thebibliography}
 
 \end{document}
