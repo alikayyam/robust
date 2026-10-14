@@ -119,11 +119,12 @@ print("real figs ok")
 # ---------------- adversarial-training data-quantity figure
 import os
 fig, axs = plt.subplots(1, 3, figsize=(11.4, 3.4))
-for ax, tag, ttl in [(axs[0], "toy_data_k64", "toy world, 64 inputs"), (axs[1], None, None)]:
-    if tag is None: continue
+ax = axs[0]
+for tag, kk, col in [("toy_data", 16, B), ("toy_data_k64", 64, O), ("toy_data_k256", 256, G)]:
     h = pickle.load(open(R + f"at_{tag}.pkl", "rb")); ns = h["ns"]
-    ax.plot(ns, [np.mean(h["std_rob"][n]) for n in ns], "o-", color=B, label="standard training"); ax.plot(ns, [np.mean(h["at_rob"][n]) for n in ns], "^--", color="#9467bd", label="adversarial training")
-    ax.axhline(h["ceiling"], color=G, ls=":", label="ceiling"); ax.set_xscale("log"); ax.set_xlabel("training examples"); ax.set_ylabel("accuracy under attack"); ax.set_title(ttl, fontsize=9); ax.legend(fontsize=7, frameon=False); fin(ax)
+    ax.plot(ns, [np.mean(h["std_rob"][n]) / h["ceiling"] for n in ns], "o-", color=col, label=f"{kk} inputs, standard")
+    ax.plot(ns, [np.mean(h["at_rob"][n]) / h["ceiling"] for n in ns], "^--", color=col, alpha=0.8, label=f"{kk} inputs, adversarial")
+ax.axhline(1.0, color=K, ls=":", lw=0.8); ax.set_xscale("log"); ax.set_xlabel("training examples"); ax.set_ylabel("accuracy under attack / ceiling"); ax.set_title("toy world", fontsize=9); ax.legend(fontsize=6, frameon=False, loc="lower right"); fin(ax)
 at = pickle.load(open(R + "at_real.pkl", "rb"))
 for ax, d, ttl in [(axs[1], "mnist", r"MNIST, $\epsilon=0.1$"), (axs[2], "cifar", r"CIFAR-10, $\epsilon=2/255$")]:
     ns = sorted(n for (dd, n) in at if dd == d)
