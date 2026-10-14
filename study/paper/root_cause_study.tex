@@ -24,8 +24,8 @@ A Controlled Tour of the Candidate Root Causes}
 \begin{abstract}
 Networks are now far more robust to small, deliberate changes than they were a few years ago, yet there is still no agreed answer to the basic question: \emph{what is the core issue?} Many explanations have been proposed: networks add up many tiny effects, they rely on predictive but fragile features, they prefer texture to shape, their models are not sparse, they ignore directions the data never explores, they have too little data, or training simply finds the wrong solution. They are rarely compared on equal terms.
 This paper is an illustrative study for junior researchers and curious readers. We test each explanation on its own, in a small problem where the truth is known, with one yardstick throughout: the smallest change that flips the model's answer, and how it compares with the best that any model could do. We organise the findings around one split. Some vulnerability is \emph{inevitable}: given the data and the allowed change, no model can be both accurate and robust. The rest is \emph{avoidable}: a better model exists, but the objective, the optimiser, the architecture or the data do not find it.
-In our toy worlds, the dominant effect is the inevitable one, namely evidence spread over many inputs under a per-input budget. It also accounts for shape versus texture: for the best possible rule only how widely a cue is spread matters, not its frequency. On top of it we find avoidable effects that are real but smaller: ignoring irrelevant inputs (up to $2\times$), a convolutional network that reads fine textures badly, optimiser bias towards the wrong kind of solution, and sensitivity off the data manifold, which disappears with weight decay. A network trained only on adversarial changes still learns the true classes, so the changes are made of real features. More data, in these experiments, does not help under standard training.
-Checks on MNIST, Fashion-MNIST and CIFAR-10 confirm several of these effects (irrelevant inputs nearly halve the flip size, the $\ell_\infty$ max-margin solution beats the $\ell_2$ one by about $50\%$, adversarial changes carry learnable features) and qualify others: more data does not help and on CIFAR-10 the flip size falls as accuracy rises, sensitivity off the main principal components appears on CIFAR-10 but not MNIST, and we find no special fragility to high frequencies. It is an aid to intuition and a map of causes, not a claim about large networks in general.
+In our toy worlds, the dominant effect is the inevitable one, namely evidence spread over many inputs under a per-input budget. It also accounts for shape versus texture: for the best possible rule only how widely a cue is spread matters, not its frequency. On top of it we find avoidable effects that are real but smaller: ignoring irrelevant inputs (up to $2\times$), a convolutional network that reads fine textures badly, optimiser bias towards the wrong kind of solution, and sensitivity off the data manifold, which disappears with weight decay. A network trained only on adversarial changes still learns the true classes, so the changes are made of real features. More data does not change vulnerability under standard training, in the toy world or on real data. Adversarial training reaches the inevitable ceiling in the toy world, so the avoidable gap there is a gap in the objective; on real data it raises flip sizes by $1.5$--$6\times$ at a cost of up to a few points of clean accuracy, and its robust accuracy then depends strongly on the amount of data.
+Checks on MNIST, Fashion-MNIST and CIFAR-10 confirm several of these effects (irrelevant inputs nearly halve the flip size, the $\ell_\infty$ max-margin solution beats the $\ell_2$ one by about $50\%$, adversarial changes carry learnable features) and qualify others: sensitivity off the main principal components appears on CIFAR-10 but not MNIST, and we find no special fragility to high frequencies. Wider and deeper networks (a $1024$-unit MLP, ResNet-18) show the same picture. It is an aid to intuition and a map of causes, not a claim about large networks in general.
 \end{abstract}
 
 \section{The puzzle and a way to organise the answer}
@@ -150,13 +150,15 @@ Here we ask directly how much vulnerability is inevitable. For a linear rule wit
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.62\textwidth]{h10_ceiling.pdf}
-\caption{Accuracy under attack against the allowed per-input change. Green: the best achievable rule (the inevitable ceiling). Blue: a trained network. Dashed: the best clean rule. The shaded gap is avoidable, but only by changing the training objective.}
+\caption{Accuracy under attack against the allowed per-input change. Green: the best achievable rule (the inevitable ceiling). Blue: a trained network. Purple triangles: the same network adversarially trained. Dashed: the best clean rule. The shaded gap is avoidable, but only by changing the training objective.}
 \label{fig:h10}
 \end{figure}
 
 At $\epsilon=0.3$ the ceiling is $0.75$ (reached by using the reliable clue only), while the best clean rule gets $0.42$ and the trained network $0.45$. The ceiling itself falls as $\epsilon$ grows ($0.63$ at $\epsilon=0.4$): part of the loss is inevitable. The gap between ceiling and network, about $0.3$ at $\epsilon=0.3$, is avoidable, yet \emph{standard training will not close it}, because the standard objective rewards the clean-optimal rule. For small $\epsilon$ ($\le0.1$) the two coincide.
 
-\plain{Both parts are real. The ceiling is inevitable. The gap is avoidable by changing the objective, which is the accuracy/robustness trade-off of Tsipras et al.~\cite{tsipras2019} in numbers. We do not study adversarial training here. The ceiling is for linear rules only.}
+\paragraph{Does adversarial training close the gap?} We trained the same network by adversarial training (a 5-step attack on every batch). At $\epsilon=0.3$ it reaches $0.743\pm0.011$ accuracy under attack, against a ceiling of $0.748$ and $0.44$ for standard training; at $\epsilon=0.2$ it reaches $0.840$ against a ceiling of $0.841$ (standard: $0.76$); at $\epsilon=0.1$ there is no gap to close. The price is clean accuracy: $0.954$ and $0.960$ against $0.993$ (Figure~\ref{fig:h10}, triangles).
+
+\plain{Both parts are real. The ceiling is inevitable. The gap is avoidable by changing the objective, and adversarial training closes it completely here, at the cost of the clean accuracy the weak clues carried: the accuracy/robustness trade-off of Tsipras et al.~\cite{tsipras2019} in numbers. The ceiling is for linear rules only.}
 
 \subsection{H7: which solution the optimiser reaches}
 \label{sec:h7}
@@ -190,7 +192,16 @@ We checked the stand-in directly: 20\,000 steps of gradient descent on the logis
 
 Accuracy rises from $0.905$ to $0.953$, but the flip size equals the best rule's ($0.109$--$0.111$) at every $n$.
 
-\plain{In this world, more data under standard training does not change vulnerability. Caveat: the network is strongly regularised (weight decay), which may hide an effect; and we have not trained adversarially, where data quantity is known to matter. Not supported as a cause here.}
+\paragraph{With adversarial training.} Schmidt et al.'s claim is about robust (adversarially trained) learning, so we repeat the experiment with it. In the toy world with $64$ inputs ($\epsilon=0.03$, ceiling $0.76$), adversarial and standard training give the same accuracy under attack at every $n$, both climbing to the ceiling ($0.62$ at $n=30$, $0.75$ at $n=1000$, $0.76$ at $n=16\,000$). The data needed to get within a few percent of the ceiling grows with the number of inputs: about $100$ examples with $16$ inputs, about $1000$ with $64$. On real data (Figure~\ref{fig:atdata}), standard networks have almost no accuracy under attack at any size (MNIST $0.01$--$0.05$, CIFAR-10 $0.03$--$0.06$), while adversarially trained ones reach $0.25$, $0.57$, $0.69$ (MNIST, $\epsilon=0.1$, $100$, $1000$, $10\,000$ examples) and $0.22$, $0.47$, $0.57$ (CIFAR-10, $\epsilon=2/255$, $1000$, $5000$, $20\,000$ examples). Their flip sizes are $1.5$--$3\times$ (MNIST) and $2$--$6\times$ (CIFAR-10) those of standard networks, at a clean-accuracy cost of up to $6$ points on CIFAR-10 and about $0$--$1$ points on MNIST (where the cost is negative at $1000$ examples).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\textwidth]{at_data.pdf}
+\caption{Accuracy under attack against the number of training examples, with standard and adversarial training. Left: the toy world with $64$ inputs (dotted: the ceiling). Middle and right: MNIST and CIFAR-10; the dotted gray line is the clean accuracy of the adversarially trained network.}
+\label{fig:atdata}
+\end{figure}
+
+\plain{Under standard training, more data does not change vulnerability, in the toy world or on real data. Under adversarial training, data quantity matters a lot for real data (robust accuracy rises steeply with $n$), as Schmidt et al.\ argue; in the toy world adversarial training needs no more data than standard training to reach the same ceiling, though the data needed grows with the number of inputs. So data quantity is a cause of \emph{robust learning being hard}, not of standard models being fragile.}
 
 \subsection{H5: directions the data never use}
 \label{sec:h5}
@@ -271,7 +282,7 @@ Each toy hypothesis that can be checked without adversarial training gets a real
 
 \paragraph{H2, transfer.} A fresh network trained only on adversarially changed images with random target labels reaches clean accuracy $0.77$, $0.83$ and $0.80$ on MNIST for changes of size $0.1$, $0.2$ and $0.3$, and $0.37$ on CIFAR-10 at $0.03$ ($0.16$ at $0.1$); the random-noise controls stay at chance ($\approx0.10$). Adversarial changes carry learnable features on real data too, much more weakly on CIFAR-10 with these small networks.
 
-\paragraph{H6, more data.} On MNIST the flip size is flat ($0.043$--$0.050$) from $100$ to $30\,000$ examples while accuracy rises from $0.69$ to $0.97$. On CIFAR-10 it \emph{falls} as data and accuracy grow ($0.0059$, $0.0041$, $0.0027$ for $1000$, $5000$, $20\,000$ examples; accuracy $0.50$, $0.66$, $0.78$). Caveat: flip sizes are medians over correctly classified points, so small-data models are measured on an easier subset.
+\paragraph{H6, more data.} On MNIST the flip size is flat ($0.043$--$0.050$) from $100$ to $30\,000$ examples while accuracy rises from $0.69$ to $0.97$. On CIFAR-10 it is flat too ($0.0027$, $0.0025$, $0.0026$ for $1000$, $5000$, $20\,000$ examples; accuracy $0.56$, $0.69$, $0.79$) once every training-set size gets the same number of optimiser steps. (A first run with a fixed number of epochs showed a flip size falling with data; that was an artefact of undertraining the small sets.)
 
 \begin{table}[H]
 \centering
@@ -300,7 +311,31 @@ H9: fully connected / convolutional ($\ell_\infty$) & MNIST & $0.045$ & $0.088$ 
 
 \paragraph{H9, architecture.} The convolutional network doubles the $\ell_\infty$ flip size on MNIST ($0.088$ against $0.045$) but is no better on Fashion-MNIST, and on CIFAR-10 it is more accurate ($0.73$ against $0.46$) but has a \emph{smaller} flip size ($0.0032$ against $0.0052$).
 
-\plain{Real data mostly confirm the toy mechanisms and the avoidable effects: noise versus worst case (same order), irrelevant inputs (about $1.8\times$), optimiser bias ($+50\%$), and transfer. They qualify others: more data does not help (and on CIFAR-10 the flip size falls with accuracy, the accuracy--robustness trade-off), off-manifold sensitivity is a CIFAR-10 effect, high-frequency fragility is not found, and a better architecture is not consistently more robust. Caveats: small networks, standard training, few runs.}
+\paragraph{Larger networks.} To check that the small networks are not the reason, we repeat the main checks with a $1024$-unit, four-layer fully connected network on MNIST and a ResNet-18 on CIFAR-10 (Table~\ref{tab:big}).
+
+\begin{table}[H]
+\centering
+\caption{Larger networks. Median flip sizes ($\ell_\infty$ unless marked $\ell_2$); same conditions as the small networks.}
+\label{tab:big}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcc}
+\toprule
+Check & Wide MLP, MNIST & ResNet-18, CIFAR-10 \\
+\midrule
+Accuracy ($10\,000$ / $20\,000$ images) & $0.962$ & $0.809$ \\
+$\ell_\infty$ flip size (small network) & $0.044$ ($0.045$) & $0.0039$ ($0.0032$) \\
+H6: flip size at $n=100$ / $1000$ / $10\,000$ / $60\,000$ (MNIST), $n=1000$ / $5000$ / $20\,000$ (CIFAR-10) & $0.038$, $0.038$, $0.044$, $0.052$ & $0.0027$, $0.0046$, $0.0039$ \\
+H4a: attack real / noise inputs / all (flip size without noise inputs) & $0.045$ / $0.048$ / $0.024$ ($0.044$) & -- \\
+H5: $\ell_2$ flip size on / off the top PCs (unrestricted) & $1.11$ / $1.38$ ($0.87$) & $0.47$ / $0.16$ ($0.16$) \\
+H3: $\ell_2$ flip size, lowest / highest 25\% of frequencies & $0.98$ / $3.87$ & $0.31$ / $0.60$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The picture does not change. Irrelevant inputs halve the flip size again ($1.8\times$). Flip size is flat in the amount of data on MNIST and varies by less than $1.7\times$ without trend on CIFAR-10. Off-manifold sensitivity appears on CIFAR-10 ($3\times$) and not on MNIST. Neither network is more fragile at high frequencies (the ResNet is $1.9\times$ \emph{less} sensitive to them). The ResNet-18 has a slightly larger flip size than the small convolutional network at much higher accuracy ($0.81$ against $0.73$).
+
+\plain{Real data mostly confirm the toy mechanisms and the avoidable effects: noise versus worst case (same order), irrelevant inputs (about $1.8\times$), optimiser bias ($+50\%$), and transfer. They qualify others: more data does not change standard flip sizes, off-manifold sensitivity is a CIFAR-10 effect, high-frequency fragility is not found, and a better architecture is not consistently more robust. Larger networks give the same picture. Caveats: few runs, one dataset per kind, standard training in these checks (adversarial training in Section~\ref{sec:h6}).}
 
 Two earlier checks complete the picture. Mixing the pixels of MNIST digits with a random rotation (same information, same total distances) leaves total flip size unchanged but shrinks per-input flip size by only $12$--$14\%$, not the eightfold drop of the toy world: pixel data are already in the spread-out regime. On CIFAR-10, letting the network use more principal components raises accuracy ($44\%\to78\%$) and shrinks \emph{both} flip sizes by about $7$--$8\times$, so that loss is a shrinking margin, not spreading. A pilot comparing the networks with nearest-neighbour classifiers shows why ``a robust classifier exists'' is hard to establish in $\ell_\infty$ (compare the separation argument of Yang et al.~\cite{yang2020}): on raw pixels every pair of images is almost equally far apart (nearest same-class and other-class distances are both about $0.99$ on MNIST).
 
@@ -322,10 +357,10 @@ H4a dense signal / irrelevant inputs & S / C & I / A & dense: same as H1; networ
 H4b weight sparsity & fix & A & removes fragility at an accuracy cost & not tested \\
 H4c activity sparsity & -- & -- & no effect; fails all at once & not tested \\
 H8 noise sensitivity & (H1) & I & restates H1: ratio $\propto\sqrt k$ & ratio $16$--$24$, linear prediction $29$--$56$ \\
-H10 objective & C & A (new objective) & ceiling $0.75$ vs standard $0.45$ at $\epsilon=0.3$ & not testable without adversarial training \\
+H10 objective & C & A (new objective) & ceiling $0.75$ vs standard $0.45$ at $\epsilon=0.3$; adversarial training reaches $0.74$ & adversarial training: flip size $\times1.5$--$6$, clean accuracy up to $-6$ points (CIFAR-10), $\approx0$ (MNIST) \\
 H7 optimiser bias & C & A & $\ell_\infty$ max-margin better when signal sparse, data scarce; gradient descent matches SVM & $\ell_\infty$ solution: $+54\%$ (MNIST), $+58\%$ (Fashion-MNIST) flip size, higher accuracy \\
-H6 data quantity & -- & -- & no effect under standard training & MNIST flat; CIFAR-10 flip size falls as accuracy rises \\
-H5 off-manifold & C (small) & A & vanishes with weight decay; $\sim20\%$ without & CIFAR-10: $4\times$ more sensitive off top PCs; MNIST: not \\
+H6 data quantity & -- (standard); C (adversarial) & A & no effect under standard training; adversarial training needs no more data than standard, but data needed grows with inputs & flat for standard training (small and large networks); adversarial robust accuracy rises $0.25\to0.69$ with data \\
+H5 off-manifold & C (small) & A & vanishes with weight decay; $\sim20\%$ without & CIFAR-10: $3$--$4\times$ more sensitive off top PCs (small CNN, ResNet-18); MNIST: not \\
 H3 shape vs texture & C & I, A & spread is inevitable (best rule: flip size $\times$ spread constant, frequency irrelevant); architecture is avoidable (CNN weak on fine patterns, shape-biased) & no special high-frequency fragility (MNIST less, CIFAR-10 equal) \\
 H9 architecture & C & A & invariance: $4$--$5\times$ flip size over fully connected, $1.6\times$ below hand-built filter & MNIST $2\times$ better; Fashion-MNIST equal; CIFAR-10 smaller flip size \\
 \bottomrule
@@ -334,19 +369,21 @@ H9 architecture & C & A & invariance: $4$--$5\times$ flip size over fully connec
 
 \section{Discussion (draft)}
 
-In the toy worlds, the first-order cause of fragility to small per-input changes is inevitable: the evidence a good classifier uses is spread over many inputs or carried by clues that are small compared with the allowed change, and a per-input budget lets the attacker push all of it together. Several explanations that look different (noise sensitivity, dense signals, texture reliance as a category) are the same mechanism seen from other sides: only how widely the evidence is spread matters for the best rule. Avoidable causes exist and can be sizeable (up to a factor of two from ignoring irrelevant inputs; $1.6\times$ from a learned rather than designed filter; a convolutional network that reads fine patterns badly; large when the objective ignores robustness), but they sit on top of the inevitable one and cannot remove it. The real-data checks support the mechanism and several of the avoidable effects (irrelevant inputs, optimiser bias, transfer) but not every toy prediction (data quantity, off-manifold sensitivity, architecture). So this remains a hypothesis about large networks, not a result.
+In the toy worlds, the first-order cause of fragility to small per-input changes is inevitable: the evidence a good classifier uses is spread over many inputs or carried by clues that are small compared with the allowed change, and a per-input budget lets the attacker push all of it together. Several explanations that look different (noise sensitivity, dense signals, texture reliance as a category) are the same mechanism seen from other sides: only how widely the evidence is spread matters for the best rule. Avoidable causes exist and can be sizeable (up to a factor of two from ignoring irrelevant inputs; $1.6\times$ from a learned rather than designed filter; a convolutional network that reads fine patterns badly; large when the objective ignores robustness), but they sit on top of the inevitable one and cannot remove it. The real-data checks, with small and large networks, support the mechanism and several of the avoidable effects (irrelevant inputs, optimiser bias, transfer, the objective) but not every toy prediction (off-manifold sensitivity, architecture). So this remains a hypothesis about large networks, not a result.
 
 \paragraph{What would change our mind.} A real task where the classes are well separated in $\ell_\infty$, a robust classifier is easy to write down, and standard training still finds a fragile one, would be a case where the avoidable part dominates. Finding or constructing such a case on real data is the most valuable open test.
 
 \section{Limits}
 
-Independent Gaussian clues, small networks, one-step and projected attacks, no adversarial training, and small networks and few runs on real data. Weight decay is on by default and affects H5 and H6. ``Root cause'' is strong language: we claim a map of causes and their rough size in controlled worlds.
+Independent Gaussian clues, small networks, one-step and projected attacks, adversarial training studied only in the data-quantity and objective experiments, and few runs on real data. Weight decay is on by default and affects H5 and H6. ``Root cause'' is strong language: we claim a map of causes and their rough size in controlled worlds.
 
 \appendix
 \section{Settings and code map}
 \label{app:settings}
 
-Toy task: independent Gaussian clues, mean $(y-\tfrac12)\Delta\mu_i$, standard deviation $\sigma_i$, unclipped; reliable clue $\Delta\mu=1.0$, $\sigma=0.3$; weak clues $\Delta\mu=0.4$, $\sigma=0.25$. Networks: one hidden layer of 8 units (32 in H5), Adam with learning rate $0.02$, 500 full-batch steps, weight decay $10^{-2}$ unless stated, $4000$ training and $2000$ test points, 10 runs. Flip size: exact for linear rules, per-point bisection over a 20-step attack for networks. Code: \texttt{study/toy\_experiments.py} (H4a, H5--H8, H10), \texttt{study/shape\_texture.py} (H3), \texttt{study/invariance.py} (H9), the H2 transfer test (\texttt{run\_h2b}) and the gradient-descent check for H7 (\texttt{run\_h7gd}) in \texttt{study/toy\_experiments.py}, \texttt{study/pilot\_gap.py}, figures from \texttt{study/paper\_figures.py}; H1 and H4b--c use the earlier scripts in the repository root, and the real-data checks are in \texttt{study/real\_checks.py} (functions \texttt{r2b}, \texttt{r3}, \texttt{r4a}, \texttt{r5}--\texttt{r9}).
+Toy task: independent Gaussian clues, mean $(y-\tfrac12)\Delta\mu_i$, standard deviation $\sigma_i$, unclipped; reliable clue $\Delta\mu=1.0$, $\sigma=0.3$; weak clues $\Delta\mu=0.4$, $\sigma=0.25$. Networks: one hidden layer of 8 units (32 in H5), Adam with learning rate $0.02$, 500 full-batch steps, weight decay $10^{-2}$ unless stated, $4000$ training and $2000$ test points, 10 runs. Flip size: exact for linear rules, per-point bisection over a 20-step attack for networks. Code: \texttt{study/toy\_experiments.py} (H4a, H5--H8, H10), \texttt{study/shape\_texture.py} (H3), \texttt{study/invariance.py} (H9), the H2 transfer test (\texttt{run\_h2b}) and the gradient-descent check for H7 (\texttt{run\_h7gd}) in \texttt{study/toy\_experiments.py}, \texttt{study/pilot\_gap.py}, figures from \texttt{study/paper\_figures.py}; adversarial training in \texttt{study/adv\_training.py}, larger networks in \texttt{study/real\_big.py}, H1 and H4b--c use the earlier scripts in the repository root, and the real-data checks are in \texttt{study/real\_checks.py} (functions \texttt{r2b}, \texttt{r3}, \texttt{r4a}, \texttt{r5}--\texttt{r9}).
+
+\paragraph{Adversarial training and larger networks.} Adversarial training: $\ell_\infty$ PGD with 5 steps (step $2.5\epsilon/5$, random start) on every batch; evaluation by a 20-step PGD attack; $\epsilon=0.3$, $0.2$, $0.1$ in the toy world, $0.1$ on MNIST and $2/255$ on CIFAR-10; training sizes get a matched number of optimiser steps ($\ge1500$). Larger networks: a four-layer MLP with $1024$ units per layer (MNIST) and a ResNet-18 (CIFAR-10), SGD with momentum and a one-cycle schedule, matched step budgets, 2--3 runs.
 
 \begin{thebibliography}{99}
 \bibitem{szegedy2014} C.~Szegedy, W.~Zaremba, I.~Sutskever, J.~Bruna, D.~Erhan, I.~Goodfellow, R.~Fergus. \emph{Intriguing properties of neural networks}. ICLR, 2014.

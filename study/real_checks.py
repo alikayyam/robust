@@ -59,7 +59,8 @@ def train_model(name, x, y, seed, wd=None, arch=None):
     m = rc.Net().to(DEV)                                  # CIFAR CNN
     wdc = 5e-4 if wd is None else wd
     opt = torch.optim.SGD(m.parameters(), lr=0.05, momentum=0.9, weight_decay=wdc, nesterov=True)
-    ep = 15; sch = torch.optim.lr_scheduler.OneCycleLR(opt, 0.05, total_steps=ep * ((len(x) + 127) // 128)); m.train()
+    spe = (len(x) + 127) // 128; ep = 15 if len(x) >= 10000 else max(15, 1500 // spe)   # small sets get a matched step budget
+    sch = torch.optim.lr_scheduler.OneCycleLR(opt, 0.05, total_steps=ep * spe); m.train()
     for _ in range(ep):
         p = torch.randperm(len(x), device=DEV)
         for i in range(0, len(x), 128):
@@ -219,6 +220,9 @@ def r3():
 
 
 # ------------------------------------------------------------------ R6: data quantity (standard training)
+name_tag_matched = True
+
+
 def r6():
     res = {}
     for name, ns, seeds in [("mnist", [100, 300, 1000, 3000, 10000, 30000], 3), ("cifar", [1000, 5000, 20000], 2)]:
@@ -230,7 +234,7 @@ def r6():
                 row["acc"].append(accuracy(m, xte, yte)); row["inf"].append(med(flip_size(m, xte, yte, "inf", hi_inf))); row["l2"].append(med(flip_size(m, xte, yte, "2", hi_2)))
             res[(name, n)] = {k: float(np.mean(v)) for k, v in row.items()}
             print("r6", name, n, {k: round(v, 4) for k, v in res[(name, n)].items()}, flush=True)
-    save("r6", res)
+    save("r6_matched" if name_tag_matched else "r6", res)
 
 
 # ------------------------------------------------------------------ R7: l2 vs l_inf max-margin linear classifiers, few examples

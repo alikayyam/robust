@@ -11,6 +11,8 @@ def fin(ax): ax.spines[["top", "right"]].set_visible(False)
 h = L("h10"); fig, ax = plt.subplots(figsize=(5.4, 3.5))
 ax.plot(h["eps"], h["best_linear"], "s-", color=G, label="best achievable rule (the inevitable ceiling)")
 ax.errorbar(h["eps"], h["mlp"], yerr=h["mlp_sd"], fmt="o-", color=B, label="trained network")
+at = pickle.load(open(R + "at_toy_ceiling.pkl", "rb"))
+ax.plot(at["eps"], [np.mean(at["at"][e]) for e in at["eps"]], "^", color="#9467bd", ms=8, label="adversarially trained network", zorder=4)
 ax.plot(h["eps"], h["bayes"], "--", color=K, label="best clean rule (Bayes)")
 ax.fill_between(h["eps"], h["mlp"], h["best_linear"], color=G, alpha=0.12)
 ax.text(0.3, 0.6, "avoidable\nonly by changing\nthe objective", fontsize=8, ha="center", color="#2a6b2a")
@@ -85,7 +87,7 @@ print({c: round(e2["rows"][c]["inf"], 3) for c in conds}, [round(b, 3) for b in 
 
 # ---------------- real-data figures
 LR = lambda n: pickle.load(open(R + f"real_{n}.pkl", "rb"))
-r8, r4, r7, r6, r2 = LR("r8"), LR("r4a"), LR("r7"), LR("r6"), LR("r2b")
+r8, r4, r7, r6, r2 = LR("r8"), LR("r4a"), LR("r7"), LR("r6_matched"), LR("r2b")
 fig, axs = plt.subplots(1, 3, figsize=(11.2, 3.3))
 ds = ["mnist", "fmnist", "cifar"]; dl = ["MNIST", "Fashion-\nMNIST", "CIFAR-10"]; w = 0.35
 axs[0].bar(np.arange(3) - w / 2, [r8[d]["ratio_measured"] for d in ds], w, color=RED, label="measured"); axs[0].bar(np.arange(3) + w / 2, [r8[d]["ratio_predicted"] for d in ds], w, color="#7f7f7f", label="linear prediction")
@@ -113,3 +115,18 @@ for i, (d, es) in enumerate([("mnist", [0.1, 0.2, 0.3]), ("cifar", [0.03, 0.1])]
 axs[2].set_xticks([0, 1, 2, 3.6, 4.6]); axs[2].set_xticklabels(["MNIST\n0.1", "0.2", "0.3", "CIFAR-10\n0.03", "0.1"], fontsize=7); axs[2].axhline(0.1, color=K, ls="--", lw=0.8); axs[2].set_ylabel("clean accuracy, true labels"); axs[2].set_title("transfer test (chance = 0.1)", fontsize=9); axs[2].legend(fontsize=7, frameon=False); fin(axs[2])
 fig.tight_layout(); fig.savefig(F + "real_b.pdf")
 print("real figs ok")
+
+# ---------------- adversarial-training data-quantity figure
+import os
+fig, axs = plt.subplots(1, 3, figsize=(11.4, 3.4))
+for ax, tag, ttl in [(axs[0], "toy_data_k64", "toy world, 64 inputs"), (axs[1], None, None)]:
+    if tag is None: continue
+    h = pickle.load(open(R + f"at_{tag}.pkl", "rb")); ns = h["ns"]
+    ax.plot(ns, [np.mean(h["std_rob"][n]) for n in ns], "o-", color=B, label="standard training"); ax.plot(ns, [np.mean(h["at_rob"][n]) for n in ns], "^--", color="#9467bd", label="adversarial training")
+    ax.axhline(h["ceiling"], color=G, ls=":", label="ceiling"); ax.set_xscale("log"); ax.set_xlabel("training examples"); ax.set_ylabel("accuracy under attack"); ax.set_title(ttl, fontsize=9); ax.legend(fontsize=7, frameon=False); fin(ax)
+at = pickle.load(open(R + "at_real.pkl", "rb"))
+for ax, d, ttl in [(axs[1], "mnist", r"MNIST, $\epsilon=0.1$"), (axs[2], "cifar", r"CIFAR-10, $\epsilon=2/255$")]:
+    ns = sorted(n for (dd, n) in at if dd == d)
+    ax.plot(ns, [at[(d, n)]["std_rob"] for n in ns], "o-", color=B, label="standard: under attack"); ax.plot(ns, [at[(d, n)]["at_rob"] for n in ns], "^--", color="#9467bd", label="adversarial: under attack")
+    ax.plot(ns, [at[(d, n)]["at_clean"] for n in ns], "s:", color="#7f7f7f", label="adversarial: clean"); ax.set_xscale("log"); ax.set_xlabel("training examples"); ax.set_ylabel("accuracy"); ax.set_title(ttl, fontsize=9); ax.set_ylim(0, 1); ax.legend(fontsize=6, frameon=False); fin(ax)
+fig.tight_layout(); fig.savefig(F + "at_data.pdf"); print("at fig ok")
