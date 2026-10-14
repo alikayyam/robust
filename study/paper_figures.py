@@ -5,7 +5,7 @@ matplotlib.use("Agg"); matplotlib.rcParams["pdf.fonttype"] = 42
 import matplotlib.pyplot as plt
 R = "/home/akayyam/adv_reason/study/results/"; F = "/home/akayyam/adv_reason/study/paper/figs/"
 L = lambda n: pickle.load(open(R + f"toy_{n}.pkl", "rb"))
-B, O, G, K, RED = "#1f77b4", "#ff7f0e", "#2ca02c", "k", "#d62728"
+B, O, G, K, RED, PU = "#1f77b4", "#ff7f0e", "#2ca02c", "k", "#d62728", "#9467bd"
 def fin(ax): ax.spines[["top", "right"]].set_visible(False)
 
 h = L("h10"); fig, ax = plt.subplots(figsize=(5.4, 3.5))
@@ -87,17 +87,17 @@ print({c: round(e2["rows"][c]["inf"], 3) for c in conds}, [round(b, 3) for b in 
 
 # ---------------- real-data figures
 LR = lambda n: pickle.load(open(R + f"real_{n}.pkl", "rb"))
-r8, r4, r7, r6, r2 = LR("r8"), LR("r4a"), LR("r7"), LR("r6_matched"), LR("r2b")
+r8, r4, r7, r6, r2 = LR("r8_v2"), LR("r4a_v2"), LR("r7_v2"), LR("r6_matched_v2"), LR("r2b_v2")
 fig, axs = plt.subplots(1, 3, figsize=(11.2, 3.3))
 ds = ["mnist", "fmnist", "cifar"]; dl = ["MNIST", "Fashion-\nMNIST", "CIFAR-10"]; w = 0.35
 axs[0].bar(np.arange(3) - w / 2, [r8[d]["ratio_measured"] for d in ds], w, color=RED, label="measured"); axs[0].bar(np.arange(3) + w / 2, [r8[d]["ratio_predicted"] for d in ds], w, color="#7f7f7f", label="linear prediction")
 axs[0].set_xticks(range(3)); axs[0].set_xticklabels(dl); axs[0].set_ylabel("random-noise size / worst-case size"); axs[0].set_title("noise vs worst case", fontsize=9); axs[0].legend(fontsize=7, frameon=False)
 for j, (k, lab, col) in enumerate([("base_inf", "no extra inputs", "#7f7f7f"), ("real_only", "attack real pixels only", B), ("noise_only", "attack the 784 noise inputs only", O), ("all", "attack all", RED)]):
-    axs[1].bar(np.arange(2) + (j - 1.5) * 0.2, [r4[d][k] for d in ["mnist", "fmnist"]], 0.2, color=col, label=lab)
+    axs[1].bar(np.arange(2) + (j - 1.5) * 0.2, [r4[d][k] for d in ["mnist", "fmnist"]], 0.2, yerr=[r4[d][k + "_sd"] for d in ["mnist", "fmnist"]], capsize=2, color=col, label=lab)
 axs[1].set_xticks(range(2)); axs[1].set_xticklabels(["MNIST", "Fashion-MNIST"]); axs[1].set_ylabel(r"median $\ell_\infty$ flip size"); axs[1].set_title("irrelevant inputs added", fontsize=9); axs[1].legend(fontsize=6, frameon=False)
 for j, (d, n) in enumerate([("mnist", 100), ("fmnist", 100)]):
-    axs[2].bar(j - 0.18, r7[(d, n)]["svm_rad"], 0.36, color=O, label=r"$\ell_2$ max-margin" if j == 0 else None); axs[2].bar(j + 0.18, r7[(d, n)]["lp_rad"], 0.36, color=G, label=r"$\ell_\infty$ max-margin" if j == 0 else None)
-    axs[2].text(j - 0.18, r7[(d, n)]["svm_rad"] + 0.003, f"acc {r7[(d, n)]['svm_acc']:.2f}", ha="center", fontsize=6); axs[2].text(j + 0.18, r7[(d, n)]["lp_rad"] + 0.003, f"acc {r7[(d, n)]['lp_acc']:.2f}", ha="center", fontsize=6)
+    axs[2].bar(j - 0.18, r7[(d, n)]["svm_rad"], 0.36, yerr=r7[(d, n)]["svm_rad_sd"], capsize=2, color=O, label=r"$\ell_2$ max-margin" if j == 0 else None); axs[2].bar(j + 0.18, r7[(d, n)]["lp_rad"], 0.36, yerr=r7[(d, n)]["lp_rad_sd"], capsize=2, color=G, label=r"$\ell_\infty$ max-margin" if j == 0 else None)
+    axs[2].text(j - 0.18, r7[(d, n)]["svm_rad"] + r7[(d, n)]["svm_rad_sd"] + 0.004, f"acc {r7[(d, n)]['svm_acc']:.2f}", ha="center", fontsize=6); axs[2].text(j + 0.18, r7[(d, n)]["lp_rad"] + r7[(d, n)]["lp_rad_sd"] + 0.004, f"acc {r7[(d, n)]['lp_acc']:.2f}", ha="center", fontsize=6)
 axs[2].set_xticks(range(2)); axs[2].set_xticklabels(["MNIST 3 vs 7", "Fashion-MNIST\nT-shirt vs shirt"]); axs[2].set_ylabel(r"median $\ell_\infty$ flip size (100 examples)"); axs[2].set_title("which max-margin solution", fontsize=9); axs[2].legend(fontsize=7, frameon=False)
 for a in axs: fin(a)
 fig.tight_layout(); fig.savefig(F + "real_a.pdf")
@@ -105,12 +105,12 @@ fig.tight_layout(); fig.savefig(F + "real_a.pdf")
 fig, axs = plt.subplots(1, 3, figsize=(11.2, 3.3))
 for ax, d in zip(axs[:2], ["mnist", "cifar"]):
     ns = sorted(n for (dd, n) in r6 if dd == d)
-    ax.plot(ns, [r6[(d, n)]["inf"] for n in ns], "o-", color=B); ax.set_xscale("log"); ax.set_xlabel("training examples"); ax.set_ylabel(r"median $\ell_\infty$ flip size", color=B)
+    ax.errorbar(ns, [r6[(d, n)]["inf"] for n in ns], yerr=[r6[(d, n)]["inf_sd"] for n in ns], fmt="o-", color=B, capsize=2); ax.set_xscale("log"); ax.set_xlabel("training examples"); ax.set_ylabel(r"median $\ell_\infty$ flip size", color=B)
     a2 = ax.twinx(); a2.plot(ns, [r6[(d, n)]["acc"] for n in ns], "s--", color=G); a2.set_ylabel("accuracy", color=G); a2.set_ylim(0, 1); ax.set_title({"mnist": "MNIST (fully connected)", "cifar": "CIFAR-10 (convolutional)"}[d], fontsize=9); ax.set_ylim(0, None); fin(ax); a2.spines[["top"]].set_visible(False)
 for i, (d, es) in enumerate([("mnist", [0.1, 0.2, 0.3]), ("cifar", [0.03, 0.1])]):
     for j, e in enumerate(es):
         x0 = i * 3.6 + j
-        axs[2].bar(x0 - 0.18, np.mean(r2[d][e]["adv"]), 0.36, color=B, label="adversarial changes only" if (i == 0 and j == 0) else None)
+        axs[2].bar(x0 - 0.18, np.mean(r2[d][e]["adv"]), 0.36, yerr=np.std(r2[d][e]["adv"], ddof=1), capsize=2, color=B, label="adversarial changes only" if (i == 0 and j == 0) else None)
         axs[2].bar(x0 + 0.18, np.mean(r2[d][e]["noise"]), 0.36, color="#7f7f7f", label="random-noise control" if (i == 0 and j == 0) else None)
 axs[2].set_xticks([0, 1, 2, 3.6, 4.6]); axs[2].set_xticklabels(["MNIST\n0.1", "0.2", "0.3", "CIFAR-10\n0.03", "0.1"], fontsize=7); axs[2].axhline(0.1, color=K, ls="--", lw=0.8); axs[2].set_ylabel("clean accuracy, true labels"); axs[2].set_title("transfer test (chance = 0.1)", fontsize=9); axs[2].legend(fontsize=7, frameon=False); fin(axs[2])
 fig.tight_layout(); fig.savefig(F + "real_b.pdf")
@@ -131,3 +131,23 @@ for ax, d, ttl in [(axs[1], "mnist", r"MNIST, $\epsilon=0.1$"), (axs[2], "cifar"
     ax.plot(ns, [at[(d, n)]["std_rob"] for n in ns], "o-", color=B, label="standard: under attack"); ax.plot(ns, [at[(d, n)]["at_rob"] for n in ns], "^--", color="#9467bd", label="adversarial: under attack")
     ax.plot(ns, [at[(d, n)]["at_clean"] for n in ns], "s:", color="#7f7f7f", label="adversarial: clean"); ax.set_xscale("log"); ax.set_xlabel("training examples"); ax.set_ylabel("accuracy"); ax.set_title(ttl, fontsize=9); ax.set_ylim(0, 1); ax.legend(fontsize=6, frameon=False); fin(ax)
 fig.tight_layout(); fig.savefig(F + "at_data.pdf"); print("at fig ok")
+
+# ---------------- mechanism on real data
+rec = pickle.load(open(R + "mechanism_real.pkl", "rb"))
+ei = np.array([x["eps_inf"] for x in rec]); e2 = np.array([x["eps_2"] for x in rec]); Sg = np.array([x["S_grad"] for x in rec]); Sf = np.array([x["S_flip"] for x in rec]); dd = np.array([x["d"] for x in rec]); tg = np.array([x["tag"] for x in rec])
+cols = {"mnist": B, "fmnist": O, "cifar_cnn": G, "cifar_mlp": PU}; labs = {"mnist": "MNIST MLPs", "fmnist": "Fashion-MNIST MLPs", "cifar_cnn": "CIFAR-10 CNNs (3 resolutions)", "cifar_mlp": "CIFAR-10 MLPs"}
+fig, axs = plt.subplots(1, 3, figsize=(11.6, 3.6))
+for t in cols:
+    m = tg == t; axs[0].scatter(e2[m] / Sg[m], ei[m], s=14, color=cols[t], label=labs[t], alpha=0.8)
+lo, hi_ = ei.min() * 0.8, ei.max() * 1.2; axs[0].plot([lo, hi_], [lo, hi_], "k:", lw=0.8); axs[0].set_xscale("log"); axs[0].set_yscale("log")
+axs[0].set_xlabel(r"predicted: $\epsilon_2 / S_{\rm grad}$"); axs[0].set_ylabel(r"measured $\ell_\infty$ flip size"); axs[0].legend(fontsize=6, frameon=False); axs[0].set_title("92 trained models", fontsize=9)
+dense = np.sqrt(2 / np.pi) * np.sqrt(dd)
+for t in cols:
+    m = tg == t; axs[1].scatter(dense[m], Sf[m], s=14, color=cols[t], alpha=0.8)
+xx = np.array([8, 50]); axs[1].plot(xx, xx, "k:", lw=0.8); axs[1].set_xlabel(r"dense limit $\sqrt{2/\pi}\sqrt{d}$"); axs[1].set_ylabel(r"measured spread $\epsilon_2/\epsilon_\infty$"); axs[1].set_title("how spread out the gradient is", fontsize=9)
+resl = [8, 16, 32]; mm = {r: np.array([x.get("arch") == f"cnn_res{r}" for x in rec]) for r in resl}
+a1 = axs[2]; a2 = a1.twinx(); dl = [3 * r * r for r in resl]
+a1.plot(dl, [ei[mm[r]].mean() for r in resl], "o-", color=RED, label=r"$\ell_\infty$ flip size"); a2.plot(dl, [e2[mm[r]].mean() for r in resl], "s--", color=B, label=r"$\ell_2$ flip size")
+a1.set_xscale("log"); a1.set_xlabel("number of inputs $d$ (image resolution 8, 16, 32)"); a1.set_ylabel(r"$\ell_\infty$ flip size", color=RED); a2.set_ylabel(r"$\ell_2$ flip size", color=B); a1.set_ylim(0, None); a2.set_ylim(0, None); a1.set_title("CIFAR-10 at three resolutions", fontsize=9)
+for a in [axs[0], axs[1], a1]: fin(a)
+a2.spines[["top"]].set_visible(False); fig.tight_layout(); fig.savefig(F + "mech_real.pdf"); print("mech fig ok")

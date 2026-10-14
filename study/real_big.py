@@ -17,7 +17,14 @@ OUT = "/home/akayyam/adv_reason/study/results/"
 SMOKE = bool(os.environ.get("SMOKE"))
 
 
-def save(n, o): pickle.dump(o, open(OUT + f"big_{n}.pkl", "wb"))
+def save(n, o): pickle.dump(o, open(OUT + f"big_{n}_v2.pkl", "wb"))
+
+
+def agg(row):
+    out = {}
+    for k, v in row.items():
+        a = np.asarray(v, float); out[k] = float(np.nanmean(a)); out[k + "_sd"] = float(np.nanstd(a, ddof=1)) if len(a) > 1 else 0.0
+    return out
 
 
 class Block(nn.Module):
@@ -64,14 +71,14 @@ def S(seeds_default): return 1 if SMOKE else seeds_default
 
 def r6_big():
     res = {}
-    for name, ns, seeds in [("mnist", [100, 1000, 10000, 60000], 3), ("cifar", [1000, 5000, 20000], 2)]:
+    for name, ns, seeds in [("mnist", [100, 1000, 10000, 60000], 5), ("cifar", [1000, 5000, 20000], 3)]:
         xtr, ytr, xte, yte = load(name); hi_inf, hi_2 = HI[name]
         for n in (ns[:2] if SMOKE else ns):
             row = {"acc": [], "inf": [], "l2": []}
             for s in range(S(seeds)):
                 x, y = subset(xtr, ytr, n, s); m = train_big(name, x, y, s)
                 row["acc"].append(accuracy(m, xte, yte)); row["inf"].append(med(flip_size(m, xte, yte, "inf", hi_inf))); row["l2"].append(med(flip_size(m, xte, yte, "2", hi_2)))
-            res[(name, n)] = {k: float(np.mean(v)) for k, v in row.items()}
+            res[(name, n)] = agg(row)
             print("r6_big", name, n, {k: round(v, 4) for k, v in res[(name, n)].items()}, flush=True)
     save("r6", res)
 
@@ -82,12 +89,12 @@ def r5_big():
         xtr, ytr, xte, yte = load(name); hi_inf, hi_2 = HI[name]
         for wd in wds:
             row = {"tangent": [], "normal": [], "full": [], "acc": []}
-            for s in range(S(2)):
+            for s in range(S(3)):
                 x, y = subset(xtr, ytr, n, s); P = pca_projector(x, k); Pn = torch.eye(P.shape[0], device=DEV) - P
                 m = train_big(name, x, y, s, wd=wd)
                 row["acc"].append(accuracy(m, xte, yte)); row["tangent"].append(med(flip_size(m, xte, yte, "2", hi_2, P=P)))
                 row["normal"].append(med(flip_size(m, xte, yte, "2", hi_2, P=Pn))); row["full"].append(med(flip_size(m, xte, yte, "2", hi_2)))
-            res[(name, wd)] = {kk: float(np.mean(v)) for kk, v in row.items()}
+            res[(name, wd)] = agg(row)
             print("r5_big", name, wd, {kk: round(v, 3) for kk, v in res[(name, wd)].items()}, flush=True)
     save("r5", res)
 
@@ -99,11 +106,11 @@ def r3_big():
         for tag, p1 in P1.items():
             p1 = torch.tensor(p1, dtype=torch.float32); Ps[tag] = (p1 if ch == 1 else torch.block_diag(*[p1] * ch)).to(DEV)
         row = {"low": [], "high": [], "full": [], "acc": []}
-        for s in range(S(2)):
+        for s in range(S(3)):
             x, y = subset(xtr, ytr, n, s); m = train_big(name, x, y, s)
             row["acc"].append(accuracy(m, xte, yte)); row["low"].append(med(flip_size(m, xte, yte, "2", hi_2, P=Ps["low"]))); row["high"].append(med(flip_size(m, xte, yte, "2", hi_2, P=Ps["high"])))
             row["full"].append(med(flip_size(m, xte, yte, "2", hi_2)))
-        res[name] = {k: float(np.mean(v)) for k, v in row.items()}
+        res[name] = agg(row)
         print("r3_big", name, {k: round(v, 3) for k, v in res[name].items()}, flush=True)
     save("r3", res)
 
@@ -111,7 +118,7 @@ def r3_big():
 def r4a_big():
     res = {}
     xtr, ytr, xte, yte = load("mnist"); hi_inf, _ = HI["mnist"]; row = {k: [] for k in ["base_acc", "noise_acc", "base_inf", "real_only", "noise_only", "all"]}
-    for s in range(S(3)):
+    for s in range(S(5)):
         x, y = subset(xtr, ytr, 10000, s); g = torch.Generator().manual_seed(100 + s)
         xn = torch.cat([x, 0.3 * torch.randn(len(x), 784, generator=g)], 1); xten = torch.cat([xte, 0.3 * torch.randn(len(xte), 784, generator=g)], 1)
         m0 = train_big("mnist", x, y, s); m1 = train_big("mnist", xn, y, s, in_dim=1568)
@@ -119,17 +126,17 @@ def r4a_big():
         mr = torch.cat([torch.ones(784), torch.zeros(784)]).to(DEV); mn = 1 - mr
         row["real_only"].append(med(flip_size(m1, xten, yte, "inf", hi_inf, mask=mr))); row["noise_only"].append(med(flip_size(m1, xten, yte, "inf", hi_inf, mask=mn)))
         row["all"].append(med(flip_size(m1, xten, yte, "inf", hi_inf)))
-    res["mnist"] = {k: float(np.mean(v)) for k, v in row.items()}; print("r4a_big", res["mnist"], flush=True); save("r4a", res)
+    res["mnist"] = agg(row); print("r4a_big", res["mnist"], flush=True); save("r4a", res)
 
 
 def r9_big():
     res = {}
     for name, arch_n in [("mnist", 10000), ("cifar", 20000)]:
         xtr, ytr, xte, yte = load(name); hi_inf, hi_2 = HI[name]; row = {"acc": [], "inf": [], "l2": []}
-        for s in range(S(2)):
+        for s in range(S(3)):
             x, y = subset(xtr, ytr, arch_n, s); m = train_big(name, x, y, s)
             row["acc"].append(accuracy(m, xte, yte)); row["inf"].append(med(flip_size(m, xte, yte, "inf", hi_inf))); row["l2"].append(med(flip_size(m, xte, yte, "2", hi_2)))
-        res[name] = {k: float(np.mean(v)) for k, v in row.items()}; print("r9_big", name, {k: round(v, 4) for k, v in res[name].items()}, flush=True)
+        res[name] = agg(row); print("r9_big", name, {k: round(v, 4) for k, v in res[name].items()}, flush=True)
     save("r9", res)
 
 

@@ -14,7 +14,17 @@ DEV = rd.DEV; OUT = "/home/akayyam/adv_reason/study/results/"
 NTEST = 300
 
 
-def save(name, obj): pickle.dump(obj, open(OUT + f"real_{name}.pkl", "wb"))
+SUFFIX = "_v2"; NS = 5
+
+
+def save(name, obj): pickle.dump(obj, open(OUT + f"real_{name}{SUFFIX}.pkl", "wb"))
+
+
+def agg(row):
+    out = {}
+    for k, v in row.items():
+        a = np.asarray(v, float); out[k] = float(np.nanmean(a)); out[k + "_sd"] = float(np.nanstd(a, ddof=1)) if len(a) > 1 else 0.0
+    return out
 def med(a): a = np.asarray(a); a = a[np.isfinite(a)]; return float(np.median(a)) if len(a) else float("nan")
 
 
@@ -37,9 +47,10 @@ def subset(x, y, n, seed):
 def train_model(name, x, y, seed, wd=None, arch=None):
     torch.manual_seed(seed); x, y = x.to(DEV), y.to(DEV)
     if name in ("mnist", "fmnist") and arch != "cnn":
-        old = rd.WD
+        old, olde = rd.WD, rd.EPOCHS
         if wd is not None: rd.WD = wd
-        m = rd.train(x, y, 10); rd.WD = old; return m
+        rd.EPOCHS = max(20, 1500 // ((len(x) + rd.BS - 1) // rd.BS))   # matched optimiser-step budget
+        m = rd.train(x, y, 10); rd.WD, rd.EPOCHS = old, olde; return m
     if name in ("mnist", "fmnist"):                       # small CNN for H9
         m = nn.Sequential(View(1, 28), nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2), nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2), nn.Flatten(), nn.Linear(32 * 49, 10)).to(DEV)
         opt = torch.optim.SGD(m.parameters(), lr=0.05, momentum=0.9, weight_decay=1e-4)
@@ -114,7 +125,7 @@ def r8():
     res = {}
     for name in ["mnist", "fmnist", "cifar"]:
         xtr, ytr, xte, yte = load(name); hi_inf, hi_2 = HI[name]; row = {"adv_inf": [], "adv_2": [], "rand_inf": []}
-        for s in range(3):
+        for s in range(NS):
             x, y = subset(xtr, ytr, 10000, s); m = train_model(name, x, y, s)
             ai = flip_size(m, xte, yte, "inf", hi_inf); a2 = flip_size(m, xte, yte, "2", hi_2)
             xs, ys = xte[:NTEST].to(DEV), yte[:NTEST].to(DEV)
@@ -128,7 +139,7 @@ def r8():
                     with torch.no_grad(): fr += (m(xs + u).argmax(1) != ys).float()
                 hit = (fr / 40 >= 0.25).cpu().numpy(); s25 = np.where(hit, gsz, s25)
             row["adv_inf"].append(med(ai)); row["adv_2"].append(med(a2)); row["rand_inf"].append(med(s25))
-        res[name] = {k: float(np.mean(v)) for k, v in row.items()}
+        res[name] = agg(row)
         res[name]["ratio_measured"] = res[name]["rand_inf"] / res[name]["adv_inf"]
         res[name]["ratio_predicted"] = res[name]["adv_2"] / res[name]["adv_inf"] / 0.6745
         print("r8", name, {k: round(v, 3) for k, v in res[name].items()}, flush=True)
@@ -140,7 +151,7 @@ def r4a():
     res = {}
     for name in ["mnist", "fmnist"]:
         xtr, ytr, xte, yte = load(name); hi_inf, hi_2 = HI[name]; row = {k: [] for k in ["base_acc", "noise_acc", "base_inf", "real_only", "noise_only", "all"]}
-        for s in range(3):
+        for s in range(NS):
             x, y = subset(xtr, ytr, 10000, s); g = torch.Generator().manual_seed(100 + s)
             xn = torch.cat([x, 0.3 * torch.randn(len(x), 784, generator=g)], 1); xten = torch.cat([xte, 0.3 * torch.randn(len(xte), 784, generator=g)], 1)
             m0 = train_model(name, x, y, s)
@@ -157,7 +168,7 @@ def r4a():
             mr = torch.cat([torch.ones(784), torch.zeros(784)]).to(DEV); mn = 1 - mr
             row["real_only"].append(med(flip_size(m1, xten, yte, "inf", hi_inf, mask=mr))); row["noise_only"].append(med(flip_size(m1, xten, yte, "inf", hi_inf, mask=mn)))
             row["all"].append(med(flip_size(m1, xten, yte, "inf", hi_inf)))
-        res[name] = {k: float(np.mean(v)) for k, v in row.items()}
+        res[name] = agg(row)
         print("r4a", name, {k: round(v, 3) for k, v in res[name].items()}, flush=True)
     save("r4a", res)
 
@@ -173,12 +184,12 @@ def r5():
         xtr, ytr, xte, yte = load(name); hi_inf, hi_2 = HI[name]
         for wd in wds:
             row = {"tangent": [], "normal": [], "full": [], "acc": []}
-            for s in range(2 if name == "cifar" else 3):
+            for s in range(NS):
                 x, y = subset(xtr, ytr, 10000, s); P = pca_projector(x, k); Pn = torch.eye(P.shape[0], device=DEV) - P
                 m = train_model(name, x, y, s, wd=wd)
                 row["acc"].append(accuracy(m, xte, yte)); row["tangent"].append(med(flip_size(m, xte, yte, "2", hi_2, P=P)))
                 row["normal"].append(med(flip_size(m, xte, yte, "2", hi_2, P=Pn))); row["full"].append(med(flip_size(m, xte, yte, "2", hi_2)))
-            res[(name, wd)] = {kk: float(np.mean(v)) for kk, v in row.items()}
+            res[(name, wd)] = agg(row)
             print("r5", name, wd, {kk: round(v, 3) for kk, v in res[(name, wd)].items()}, flush=True)
     save("r5", res)
 
@@ -210,11 +221,11 @@ def r3():
                 # cifar tensors are flattened as (c,h,w) -> block-diagonal over channels
                 Ps[tag] = torch.block_diag(*[p1] * ch).to(DEV)
         row = {"low": [], "high": [], "full": [], "acc": []}
-        for s in range(3 if name == "mnist" else 2):
+        for s in range(NS):
             x, y = subset(xtr, ytr, 10000, s); m = train_model(name, x, y, s)
             row["acc"].append(accuracy(m, xte, yte)); row["low"].append(med(flip_size(m, xte, yte, "2", hi_2, P=Ps["low"]))); row["high"].append(med(flip_size(m, xte, yte, "2", hi_2, P=Ps["high"])))
             row["full"].append(med(flip_size(m, xte, yte, "2", hi_2)))
-        res[name] = {k: float(np.mean(v)) for k, v in row.items()}
+        res[name] = agg(row)
         print("r3", name, {k: round(v, 3) for k, v in res[name].items()}, flush=True)
     save("r3", res)
 
@@ -225,14 +236,14 @@ name_tag_matched = True
 
 def r6():
     res = {}
-    for name, ns, seeds in [("mnist", [100, 300, 1000, 3000, 10000, 30000], 3), ("cifar", [1000, 5000, 20000], 2)]:
+    for name, ns, seeds in [("mnist", [100, 300, 1000, 3000, 10000, 30000], NS), ("cifar", [1000, 5000, 20000], NS)]:
         xtr, ytr, xte, yte = load(name); hi_inf, hi_2 = HI[name]
         for n in ns:
             row = {"acc": [], "inf": [], "l2": []}
             for s in range(seeds):
                 x, y = subset(xtr, ytr, n, s); m = train_model(name, x, y, s)
                 row["acc"].append(accuracy(m, xte, yte)); row["inf"].append(med(flip_size(m, xte, yte, "inf", hi_inf))); row["l2"].append(med(flip_size(m, xte, yte, "2", hi_2)))
-            res[(name, n)] = {k: float(np.mean(v)) for k, v in row.items()}
+            res[(name, n)] = agg(row)
             print("r6", name, n, {k: round(v, 4) for k, v in res[(name, n)].items()}, flush=True)
     save("r6_matched" if name_tag_matched else "r6", res)
 
@@ -254,7 +265,7 @@ def r7():
                 for tag, ww in [("svm", w), ("lp", wl)]:
                     marg = yb * (xb @ ww); ok = marg > 0
                     row[tag + "_acc"].append(float(((xb @ ww > 0) * 2 - 1 == yb).mean())); row[tag + "_rad"].append(med(marg[ok] / np.abs(ww).sum()) if ok.any() else float("nan"))
-            res[(name, n)] = {k: float(np.nanmean(v)) for k, v in row.items()}
+            res[(name, n)] = agg(row)
             print("r7", name, n, {k: round(v, 3) for k, v in res[(name, n)].items()}, flush=True)
     save("r7", res)
 
@@ -273,7 +284,7 @@ def r2b():
     for name, epss in [("mnist", [0.1, 0.2, 0.3]), ("cifar", [0.03, 0.1])]:
         xtr, ytr, xte, yte = load(name)
         row = {e: {"adv": [], "noise": []} for e in epss}; row["clean_ref"] = []
-        for s in range(3 if name == "mnist" else 2):
+        for s in range(NS):
             x, y = subset(xtr, ytr, 10000, s); m0 = train_model(name, x, y, s); row["clean_ref"].append(accuracy(m0, xte, yte))
             t = torch.randint(0, 10, (len(x),)).to(DEV); xd = x.to(DEV)
             for e in epss:
@@ -293,10 +304,10 @@ def r9():
         xtr, ytr, xte, yte = load(name); hi_inf, hi_2 = HI[name]
         for arch in archs:
             row = {"acc": [], "inf": [], "l2": []}
-            for s in range(3 if name != "cifar" else 2):
+            for s in range(NS):
                 x, y = subset(xtr, ytr, 10000, s); m = train_model(name, x, y, s, arch=arch)
                 row["acc"].append(accuracy(m, xte, yte)); row["inf"].append(med(flip_size(m, xte, yte, "inf", hi_inf))); row["l2"].append(med(flip_size(m, xte, yte, "2", hi_2)))
-            res[(name, arch)] = {k: float(np.mean(v)) for k, v in row.items()}
+            res[(name, arch)] = agg(row)
             print("r9", name, arch, {k: round(v, 4) for k, v in res[(name, arch)].items()}, flush=True)
     save("r9", res)
 
